@@ -144,7 +144,9 @@ fit
 #predict = predict(fit, newdata=online_pivot_round, type="class")
 
 
+# multi-target regression
 
+# all 7 subMacs
 offline_pivot_x_y1 <- na.omit(offline_pivot_x_y)
 X <- cbind(offline_pivot_x_y1$`00:14:bf:b1:97:8a`,offline_pivot_x_y1$`00:14:bf:b1:97:90`,offline_pivot_x_y1$`00:0f:a3:39:e1:c0`,offline_pivot_x_y1$`00:14:bf:b1:97:8d`,
            offline_pivot_x_y1$`00:14:bf:b1:97:81`,offline_pivot_x_y1$`00:14:bf:3b:c7:c6`,offline_pivot_x_y1$`00:0f:a3:39:dd:cd`,offline_pivot_x_y1$angle)
@@ -160,3 +162,39 @@ predict_df <- as.data.frame(predict)
 names(predict_df) = c("posX","posY")
 ase <- mean((online_pivot_x_y1$posX - predict_df$posX)^2+(online_pivot_x_y1$posY - predict_df$posY)^2)
 ase
+
+# 6 subMacs, including 00:0f:a3:39:e1:c0
+offline_pivot_x_y1 <- na.omit(offline_pivot_x_y)
+X <- cbind(offline_pivot_x_y1$`00:14:bf:b1:97:8a`,offline_pivot_x_y1$`00:14:bf:b1:97:90`,offline_pivot_x_y1$`00:0f:a3:39:e1:c0`,offline_pivot_x_y1$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y1$`00:14:bf:b1:97:81`,offline_pivot_x_y1$`00:14:bf:3b:c7:c6`,offline_pivot_x_y1$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y1, scale=TRUE, validation="CV", segments=5)
+ase <- mean(fit$residuals[1]^2+fit$residuals[2]^2)
+ase
+
+online_pivot_x_y1 <- na.omit(online_pivot_x_y)
+newX <- cbind(online_pivot_x_y1$`00:14:bf:b1:97:8a`,online_pivot_x_y1$`00:14:bf:b1:97:90`,online_pivot_x_y1$`00:0f:a3:39:e1:c0`,online_pivot_x_y1$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y1$`00:14:bf:b1:97:81`,online_pivot_x_y1$`00:14:bf:3b:c7:c6`,online_pivot_x_y1$angle)
+predict <- predict(fit, ncomp=7, newdata=newX)
+predict_df <- as.data.frame(predict)
+names(predict_df) = c("posX","posY")
+ase <- mean((online_pivot_x_y1$posX - predict_df$posX)^2+(online_pivot_x_y1$posY - predict_df$posY)^2)
+ase
+
+
+# 6 subMacs, including 00:0f:a3:39:dd:cd
+offline_pivot_x_y1 <- na.omit(offline_pivot_x_y)
+X <- cbind(offline_pivot_x_y1$`00:14:bf:b1:97:8a`,offline_pivot_x_y1$`00:14:bf:b1:97:90`,offline_pivot_x_y1$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y1$`00:14:bf:b1:97:81`,offline_pivot_x_y1$`00:14:bf:3b:c7:c6`,offline_pivot_x_y1$`00:0f:a3:39:dd:cd`,offline_pivot_x_y1$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y1, scale=TRUE, validation="CV", segments=5)
+ase <- mean(fit$residuals[1]^2+fit$residuals[2]^2)
+ase
+
+online_pivot_x_y1 <- na.omit(online_pivot_x_y)
+newX <- cbind(online_pivot_x_y1$`00:14:bf:b1:97:8a`,online_pivot_x_y1$`00:14:bf:b1:97:90`,online_pivot_x_y1$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y1$`00:14:bf:b1:97:81`,online_pivot_x_y1$`00:14:bf:3b:c7:c6`,online_pivot_x_y1$`00:0f:a3:39:dd:cd`,online_pivot_x_y1$angle)
+predict <- predict(fit, ncomp=7, newdata=newX)
+predict_df <- as.data.frame(predict)
+names(predict_df) = c("posX","posY")
+ase <- mean((online_pivot_x_y1$posX - predict_df$posX)^2+(online_pivot_x_y1$posY - predict_df$posY)^2)
+ase
+
