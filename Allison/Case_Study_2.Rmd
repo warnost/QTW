@@ -1,0 +1,147 @@
+---
+title: "Case Study - Real Time Location Systems"
+date: "`r Sys.Date()`"
+author: "Allison Roderick, Jenna Ford, William Arnost"
+output:
+  rmdformats::readthedown:
+    number_sections: true
+    code_folding: hide
+    highlight: kate
+    toc_depth: 3
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+library(formatR)
+
+library(tidyverse)
+library(magrittr)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+
+```{r datapull1, echo=FALSE}
+# Read lines from offline file
+# This creates a character vector for every line in the file
+txt = readLines("Data/GeoLoc_offline.final.trace.txt")
+
+#######
+# This is taken from the R text book.  
+# Basically, read in the line, split it by tokens and then assemble it into a data matrix.
+#######
+processLine = function(x) {
+  # We split the string at ; = and , based on the format of this file
+  tokens = strsplit(x, "[;=,]")[[1]]
+  
+  # Strings with only 10 tokens stop before a mac reading
+  if (length(tokens) == 10)
+      return(NULL)
+  
+  tmp = matrix(tokens[ - (1:10) ], , 4, byrow = TRUE)  #build a 4 column matrix mac,signal,scan,type
+  cbind(matrix(tokens[c(2, 4, 6:8, 10)], nrow(tmp), 6, #builds a 6 column matrix t,scanMac,x,y,z,angle
+        byrow = TRUE), tmp) #binds them together
+}
+
+#process the whole datafile, first removing the top comments
+lines = txt[ substr(txt, 1, 1) != "#" ]
+tmp = lapply(lines, processLine)
+offline = as.data.frame(do.call("rbind", tmp),stringsAsFactors = FALSE)
+
+# create a variable with the 7 distinct mac names
+subMacs = names(sort(table(offline$mac), decreasing = TRUE))[1:7]
+
+
+# process the online data file by same method as offline
+txt = readLines("Data/GeoLoc_online.final.trace.txt")
+lines = txt[ substr(txt, 1, 1) != "#" ]
+tmp = lapply(lines, processLine)
+online = as.data.frame(do.call("rbind", tmp),stringsAsFactors = FALSE)
+
+# assign variable names to both offline and online data
+names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
+"orientation", "mac", "signal",
+"channel", "type")
+names(online) = c("time", "scanMac", "posX", "posY", "posZ",
+"orientation", "mac", "signal",
+"channel", "type")
+
+# narrow down to only type 3
+# (the only other type is type 1, which are ad hoc per the book)
+offline = offline[offline$type==3,]
+online = online[online['type']==3,]
+
+```
+
+# Introduction, Background, and Methods
+
+This case study explores the data captured by real time location systems (RLTS). The data provided indicates the signal strength, as measured in decibels (dB) by a hand-held device, of various fixed access points. Both the scanning devices and the fixed devices are identified in the data by their media access control (MAC) addresses.
+
+The data is organized as a text file with each line representing a measurement event. An example line and each variable recorded are shown below.
+
+```{r txt}
+# this is the first non-comment line in the text file
+txt[4]
+```
+
+* Time of measurement event `t`
+* Scanning device's MAC address `id` 
+  + All measurements are taken by the same scanning device, so each line has the same MAC address `00:02:2D:21:0F:33`
+* Position measured on x, y, and z axes `pos`
+  + The z-axis measurement is always 0
+* Orientation of the scanning devices `degree`
+* Data regarding the measurement recorded by up to 12 different fixed devices, which are broken into these four different fields:
+  + MAC address (the possible addresses are below)
+    - Because there are only 6 access points in the physical location this data was recorded at, we will only consider the top 7 addresses by frequency for our analysis (MAC addresses 00:0f:a3:39:e1:c0 and 00:0f:a3:39:dd:cd represent the same access point)
+  + Signal strength (measured in dB)
+  + Channel
+  + Device type
+    - We will omit all device types other than 3 as these are ad-hoc measurements beyond the scope of this analysis
+
+
+```{r unique_macs}
+# investigating frequency of measurements by mac address
+vals = data.frame(table(mac=offline['mac']))
+vals[order(-vals$Freq),]
+```
+
+Each measurement event can be uniquely identified by the time, position, and orientation of the scanning device. However, our initial processing of the text file created a "long" dataframe that had multiple rows for each unique event--one row for each of the up to 7 fixed access devices at which the measurement was recorded. We then transposed the data from "long" to "wide", in order to make each row a unique event, with 7 new variables, each representing a fixed access device's measurement.
+
+
+``` {r datapull2}
+
+# format signal stength as an integer
+offline$signal %<>% as.integer
+online$signal %<>% as.integer
+
+# limit to top 7 macs
+online = online[ online$mac %in% subMacs, ]
+offline = offline[ offline$mac %in% subMacs, ]
+
+# remove channel and scanMac as they have no bearing on the analysis
+# transpose long to wide so each of the 7 macs has a column
+offline_pivot<-select(offline, -c(channel,scanMac)) %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
+online_pivot<-select(online, -c(channel,scanMac)) %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
+
+# check for nas
+offline_pivot$nas<-rowSums(is.na(offline_pivot))
+
+# remove nas
+offline_pivot = offline_pivot[offline_pivot$nas==0,]
+
+# create categorical variable representing the x-y position 
+offline_pivot$posXY = paste(offline_pivot$posX, offline_pivot$posY, sep = "-")
+online_pivot$posXY = paste(online_pivot$posX, online_pivot$posY, sep = "-")
+
+```
