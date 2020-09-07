@@ -146,11 +146,9 @@ online$signal %<>% as.integer
 offline_pivot<-offline %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
 online_pivot<- online %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
 
-# check for nas
-offline_pivot$nas<-rowSums(is.na(offline_pivot))
-
-# remove nas
-offline_pivot = offline_pivot[offline_pivot$nas==0,]
+# impute NA 
+offline_pivot[is.na(offline_pivot)] <- -100
+online_pivot[is.na(online_pivot)] <- -100
 
 # create categorical variable representing the x-y position 
 offline_pivot$posXY = paste(offline_pivot$posX, offline_pivot$posY, sep = "-")
