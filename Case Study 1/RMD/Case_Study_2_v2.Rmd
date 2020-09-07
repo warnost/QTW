@@ -136,8 +136,6 @@ readData = function(filename = '../Data/offline.final.trace.txt',
 offline = readData(filename = '../Data/offline.final.trace.txt')
 subMacs = names(sort(table(offline$mac), decreasing = TRUE))
 online = readData(filename = '../Data/online.final.trace.txt')
-online$posXY_round = paste(round(online$posX,digits=0), round(online$posY,digits=0), sep = "-")
-online$posXY_round <- as.factor(online$posXY_round)
 
 # investigating frequency of measurements by mac address
 vals = data.frame(table(mac=offline['mac']))
@@ -170,10 +168,13 @@ Table 2: MAC Address Access Point Frequency
 
 Data types also need to be corrected. `time`, `posX`, `posY`, `orientation`, and `signal` are converted to numeric. `time` is further converted to datetime. `degree` is also adjusted by rounding to the nearest 45 degree increment.
 
-The steps outline above are used both on the offline textfile (training) and the online textfile (test). 
+Each measurement event can be uniquely identified by the time, position, and orientation of the scanning device. However, our initial processing of the text file created a "long" dataframe that had multiple rows for each unique event. Each row represents a measurement for one of the 7 fixed access devices. The dataframe is transposed from "long" to "wide" to make each row a unique event. The resulting dataframe has 7 new variables, each representing a fixed access device's measurement.
 
-Each measurement event can be uniquely identified by the time, position, and orientation of the scanning device. However, our initial processing of the text file created a "long" dataframe that had multiple rows for each unique event--one row for each of the up to 7 fixed access devices at which the measurement was recorded. We then transposed the data from "long" to "wide", in order to make each row a unique event, with 7 new variables, each representing a fixed access device's measurement.
+A review of the resulting dataframes show that there are missing values for some measurements. The models described in the next section require the data to not have missing values. The option choosen here to handle missing values is to impute them. -100 is used as the dB measurement whenever a missing value is encountered because it was sufficiently far enough away from the range of existing values. Dropping records with missing values was considered, but a significant amount of data was dropped with this method.
 
+The knn classification model will also require a singular categorical target variable. `posX` and `posY` are concatenated together into `posXY`, where the X and Y values are separated by a hyphen. At this point, a copy of the dataframe is made. One copy (offline_pivot) will be used for knn classification and the other copy (offline_pivot_x_y) will be used for multi-target regression. The reason for creating 2 datasets is that the same set of variables is not needed for each model. `posXY` is needed for knn classification, but `posX` and `posY` are needed for multi-target regression. Other variables that do not provide any extra value for modeling are dropped: `time`, `rawTime` and `orientation` (using the rounded `angle` instead).
+
+The steps outlined above are used both on the offline textfile (training) and the online textfile (test). 
 
 ``` {r datapull2}
 
@@ -186,25 +187,50 @@ online$signal %<>% as.integer
 offline_pivot<-offline %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
 online_pivot<- online %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
 
-# check for nas
-offline_pivot$nas<-rowSums(is.na(offline_pivot))
-
-# remove nas
-offline_pivot = offline_pivot[offline_pivot$nas==0,]
+# impute NA 
+offline_pivot[is.na(offline_pivot)] <- -100
+online_pivot[is.na(online_pivot)] <- -100
 
 # create categorical variable representing the x-y position 
 offline_pivot$posXY = paste(offline_pivot$posX, offline_pivot$posY, sep = "-")
 online_pivot$posXY = paste(online_pivot$posX, online_pivot$posY, sep = "-")
+online_pivot$posXY_round = paste(round(online_pivot$posX,digits=0), round(online_pivot$posY,digits=0), sep = "-")
 
+# create 2 datasets for the 2 different models, offline_pivot has posXY and offline_pivot_x_y has both posX and posY
+offline_pivot_x_y = offline_pivot
+# remove variables that are not needed for modeling
+offline_pivot = select(offline_pivot,-c(time, posX, posY, orientation, rawTime))
+offline_pivot_x_y = select(offline_pivot_x_y,-c(time, orientation, rawTime, posXY))
+
+# create 2 datasets for the 2 different models, offline_pivot has posXY and offline_pivot_x_y has both posX and posY
+online_pivot_x_y = online_pivot
+# remove variables that are not needed for modeling
+online_pivot = select(online_pivot,-c(time, posX, posY, orientation, rawTime, posXY))
+online_pivot = online_pivot %>% rename(posXY = posXY_round)
+online_pivot_x_y = select(online_pivot_x_y,-c(time, orientation, rawTime, posXY_round))
 ```
 
-# Modeling  
+## Modeling  
 
-## K-fold cross validation  
+The goal of this case study is to use the offline data to predict the x-y location of the online data. Two methods are applied towards this end: k-NN classification and multi-target regression. 
 
-Cross validation allows us to test our model on data it hasn't seen, to see how well the model performs when making predictions. Using cross validation can help identify if the model is overfitting the training data. When splitting data into training and test datasets there is a concern that important patterns found in the data may be left out of the training dataset. If these patterns are not present in the training dataset, the model won't be able to predict them in the test dataset. K-fold cross validation takes this into account by dividing the data into k folds. K-1 folds are used to train the model and the remaining fold is used for testing. This is repeated for k-1 models and every fold is used for testing once. This reduces bias and variance since we are essentially using the entire dataset for training and testing. We have chosen 5-folds for this project, a typical value chosen.  
+### k-NN classification 
 
-## Results for knn classification  
+k-NN classification is used to predict the categorical variable `posXY`, which contains the x and y coordinates separated by a hyphen. k-NN classification works as follows: for each measurement event in the dataset, the closest k neighbors are identified by finding the k smallest Euclidean distances between the datapoint and all other datapoints. The explanatory variables `angle` and the 7 signal strengths are used for calculating the Euclidean distance. The predicted class (x-y coordinates separated by a hyphen) is classified by plurality votes from the selected k nearest neighbors.
+
+### Multi-Target Regression  
+
+A drawback for using a classification modeling technique for this dataset is that combinations of X and Y that are found in the test dataset, but not the training dataset, do not have the chance of being classified correctly. A classification model can only classify observations based on the classes available in the training dataset. The training dataset provided had all X and Y values rounded to the nearest integer. The test dataset had many unrounded values. This issue and the fact that we really have 2 target variables (X and Y), lead us to research multi-target regression models.  
+
+The pls package in R provides a multi-target Partial Least Squares Regression model.  Partial Least Squares decomposes a matrix of independent variables X and a matrix of target variables Y. While we could have evaluated the number of optimal components needed for the problem here, we choose to force the model to include all components (or variables). The ability to use a matrix Y is what we focus on.
+
+### K-fold cross validation  
+
+Cross validation allows us to test our model on data it hasn't seen, to see how well the model performs when making predictions. Using cross validation can help identify if the model is overfitting the training data. When splitting data into training and test datasets there is a concern that important patterns found in the data may be left out of the training dataset. If these patterns are not present in the training dataset, the model won't be able to predict them in the test dataset. K-fold cross validation takes this into account by dividing the data into k folds. K-1 folds are used to train the model and the remaining fold is used for testing. This is repeated for k-1 models and every fold is used for testing once. This reduces bias and variance since we are essentially using the entire dataset for training and testing. We have chosen 5-folds for this project, a typical value chosen. This validation method will be applied to both k-NN classification and multi-target regression.
+
+# Results
+
+## k-NN classification  
 
 The textbook included mac address 00:0f:a3:39:e1:c0 and excluded 00:0f:a3:39:dd:cd. The reasoning found in the text indicates that these 2 have similar heat maps, indicating they are located close to one another. The first one (00:0f:a3:39:e1:c0) is chosen and 00:0f:a3:39:dd:cd is discarded. Our task was to determine if discarding 00:0f:a3:39:e1:c0 was the correct choice to make.
 The table below shows results from running knn with 5-fold cross validation for different numbers of nearest neighbors. We selected to only run odd values of K to ensure there are no issues with a tie. We also chose to not run a value of one for K. This is to minimize the possibility of overfitting.  
@@ -213,29 +239,11 @@ The table below shows results from running knn with 5-fold cross validation for 
 
 Keeping 00:0f:a3:39:e1:c0 turns out to be the better choice, when attempting to decide between 00:0f:a3:39:e1:c0 and 00:0f:a3:39:dd:cd. With K=5 an accuracy of 72.13% is achieved. 6 mac addresses were chosen because of information provided about the dataset. However, using all mac addresses and 3 neighbors achieves a higher accuracy of 75.58%. It would be advisable to discuss this finding with the data provider. If there are truly only 6 mac addresses it would not be appropriate to use all 7.  
 
-## Multi-Target Regression  
 
-A drawback for using a classification modeling technique for this dataset is that combinations of X and Y that are found in the test dataset, but not the training dataset, do not have the change of being classified correctly. A classification model can only classify observations based on the classes available in the training dataset. The training dataset provided had all X and Y values rounded to the nearest integer. The test dataset had many unrounded values. This issue and the fact that we really have 2 target variables (X and Y), lead us to research multi-target regression models.  
 
 *Table 2*
 
 ## Model Code  
-```{r model_processing}
-
-offline_pivot_x_y = offline_pivot
-offline_pivot = select(offline_pivot,-c(posX, posY, time, orientation, rawTime, nas))
-offline_pivot_x_y = select(offline_pivot_x_y,-c(posXY, time, orientation))
-head(offline_pivot)
-
-vals = data.frame(table(online['mac']))
-vals[order(-vals$Freq),]
-
-online_pivot_x_y = online_pivot
-online_pivot = select(online_pivot,-c(posX, posY,time,orientation, rawTime))
-online_pivot_x_y = select(online_pivot_x_y,-c(posXY, time,orientation))
-head(online_pivot)
-
-```
 
 ```{r}
 # all 7 subMacs
@@ -246,18 +254,15 @@ fit <- train(posXY ~ .,
              tuneGrid   = expand.grid(k = seq(3,11,2)),
              trControl  = trControl,
              data       = offline_pivot,
-             na.action  = na.omit,
              preProcess = c("center","scale")
              )
 fit
-#online_pivot_round = select(online_pivot,-c(posXY))
-#online_pivot_round %>% rename(posXY = posXY_round)
-#predict = predict(fit, newdata=online_pivot_round, type="class")
-#confusionMatrix(predict,online_pivot$posXY)
+predict = predict(fit, newdata=online_pivot, type="raw")
+confusionMatrix(predict,as.factor(online_pivot$posXY))
 
 # 6 subMacs, including 00:0f:a3:39:e1:c0
 offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:dd:cd`))
-oline_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:dd:cd`))
+online_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:dd:cd`))
 set.seed(123)
 trControl <- trainControl(method  = "cv", number  = 5)
 fit <- train(posXY ~ .,
@@ -269,9 +274,7 @@ fit <- train(posXY ~ .,
              preProcess = c("center","scale")
 )
 fit
-#online_pivot_round = select(oline_pivot_6,-c(posXY))
-#online_pivot_round %>% rename(posXY = posXY_round)
-#predict = predict(fit, newdata=online_pivot_round, type="class")
+predict = predict(fit, newdata=online_pivot_round, type="raw")
 
 
 # 6 subMacs, including 00:0f:a3:39:dd:cd
