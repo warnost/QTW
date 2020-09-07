@@ -33,46 +33,11 @@ opts_chunk$set(echo=TRUE,
 opts_knit$set(width=75)
 ```
 
-# Introduction
-
-This case study explores the data captured by real time location systems (RLTS). The data provided indicates the signal strength, as measured in decibels (dB) by a hand-held device, from various fixed access points. Both the scanning devices and the fixed devices are identified in the data by their media access control (MAC) addresses. k-NN classification is used to classify a location. This is done by combining X and Y coordinates into a single variable for classification. Due to drawbacks that are discussed later, a multi-target regression model is also run.
-
-Section 2 gives some background on the dataset. Section 3 goes into detail about the dataset, data cleanup and the models used. Next, in Section 4 the results for the models are reviewed. Section 5 highlights some drawbacks of using k-NN classification for RLTS and Section 6 concludes this case study.
-
-# Background
-
-RTLS are ubiquitous with modern technology. Your phone knows where you are and can give directions to other locations based off of your current location. You can locate someone else's phone, your car, your keys even. Global Positioning Systems (GPS) are a primary location mechanism, but primarily work outdoors. 
-
-# Methods
-
-## Dataset
-
-The data is organized as a text file with each line representing a measurement event. An example line and each variable recorded are shown below.
-
-```{r txt}
-# this is the first non-comment line in the text file
-txt = readLines('../Data/offline.final.trace.txt')
-txt[4]
-```
-
-`Table 1` presents details about the variables that are available in the dataset.
-
-Table 1: Dataset Variables
-
-| Variable        | Description | 
-| ------- |-------------| 
-| time | Time the measurement was taken in milliseconds from January 1, 1970. | 
-| id | Scanning device's MAC Address id. All measurements are taken by the same scanning device: `00:02:2D:21:0F:33`. |
-| pos | 3 position measurements: posX, posY, and posZ. posZ is always zero. |
-| degree | Orientation of the scanning device in degrees. |
-| Recorded Measurement - MAC Address | First value in the field indicating the MAC address access point. |
-| Recorded Measurement - Signal | Second value in the field indicating the signal strength measured in dB. |
-| Recorded Measurement - Channel | Third value in the field indicating the channel frequency. |
-| Recorded Measurement - Access Point Type | Fourth value in the field indicating the access point type. 1 = adhoc device. 3 = fixed access point. |
-
-## Dataset Cleanup
+# Code
 
 ```{r datapull1, echo=FALSE}
+########## Data Cleanup ##########
+
 processLine = function(x){
   tokens = strsplit(x, "[;=,]")[[1]]
   
@@ -142,43 +107,6 @@ online = readData(filename = '../Data/online.final.trace.txt')
 # investigating frequency of measurements by mac address
 vals = data.frame(table(mac=offline['mac']))
 #vals[order(-vals$Freq),] #used table 2 instead
-```
-
-Data cleanup is necessary to be able to use this text file. What follows in this section is a discussion of the data clean-up steps taken.
-
-A quick review of the textfile provided shows that there are lines that begin with `#`. These lines are comments and should not be included in the final dataset. They are removed before further processing the data.
-
-Next, a function is applied to parse the data from a sting into columns. The last 4 columns are the `Recorded Measurements` and are pulled out first. These columns do not have variable names included in the textfile. Included within the first 10 columns is a variable name and its value. Columns 2, 4, 6:8 and 10 are data values and are kept. The remaining columns are discarded. The resulting dataset is converted to a dataframe and variable names are added.
-
-There are some records in the dataset that are from adhoc access points. Due to information provided in the textbook, these records have been removed because they are not of interest.
-
-As noted in `Table 1` there are several variables that have the same value throughout the dataset: `id`, `posZ` and `channel frequency`. Also, since adhoc access points were filtered out of the dataset, `access point type` also has the same value throughout the dataset. These variables are dropped.
-
-The textbook noted that there are only 6 actual access points, however more are found in the dataset. Only the top 7 addresses by frequency will be considered in this analysis. `Table 2` displays the MAC address access point and frequency for the top 7 access points. The dataset is filtered to only include these 7 MAC addresses.
-
-Table 2: MAC Address Access Point Frequency
-
-| MAC | Frequency | 
-| - |------| 
-| 00:0f:a3:39:e1:c0 | 145,862 | 
-| 00:0f:a3:39:dd:cd | 145,619 |
-| 00:14:bf:b1:97:8a | 132,962 |
-| 00:14:bf:3b:c7:c6 | 126,529 |
-| 00:14:bf:b1:97:90 | 122,315 |
-| 00:14:bf:b1:97:8d | 121,325 |
-| 00:14:bf:b1:97:81 | 120,339 |
-
-Data types also need to be corrected. `time`, `posX`, `posY`, `orientation`, and `signal` are converted to numeric. `time` is further converted to datetime. `degree` is also adjusted by rounding to the nearest 45 degree increment.
-
-Each measurement event can be uniquely identified by the time, position, and orientation of the scanning device. However, our initial processing of the text file created a "long" dataframe that had multiple rows for each unique event. Each row represents a measurement for one of the 7 fixed access devices. The dataframe is transposed from "long" to "wide" to make each row a unique event. The resulting dataframe has 7 new variables, each representing a fixed access device's measurement.
-
-A review of the resulting dataframes show that there are missing values for some measurements. The models described in the next section require the data to not have missing values. The option choosen here to handle missing values is to impute them. -100 is used as the dB measurement whenever a missing value is encountered because it was sufficiently far enough away from the range of existing values. Dropping records with missing values was considered, but a significant amount of data was dropped with this method.
-
-The knn classification model will also require a singular categorical target variable. `posX` and `posY` are concatenated together into `posXY`, where the X and Y values are separated by a hyphen. At this point, a copy of the dataframe is made. One copy (offline_pivot) will be used for knn classification and the other copy (offline_pivot_x_y) will be used for multi-target regression. The reason for creating 2 datasets is that the same set of variables is not needed for each model. `posXY` is needed for knn classification, but `posX` and `posY` are needed for multi-target regression. Other variables that do not provide any extra value for modeling are dropped: `time`, `rawTime` and `orientation` (using the rounded `angle` instead).
-
-The steps outlined above are used both on the offline textfile (training) and the online textfile (test). 
-
-``` {r datapull2}
 
 # format signal stength as an integer
 offline$signal %<>% as.integer
@@ -212,6 +140,177 @@ online_pivot = online_pivot %>% rename(posXY = posXY_round)
 online_pivot_x_y = select(online_pivot_x_y,-c(time, orientation, rawTime, posXY_round))
 ```
 
+```{r}
+########## Model Code ##########
+# all 7 subMacs
+set.seed(123)
+trControl <- trainControl(method  = "cv", number  = 5)
+fit <- train(posXY ~ .,
+             method     = "knn",
+             tuneGrid   = expand.grid(k = seq(3,11,2)),
+             trControl  = trControl,
+             data       = offline_pivot,
+             preProcess = c("center","scale")
+             )
+fit
+predict = predict(fit, newdata=online_pivot, type="raw")
+accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot$posXY)))
+accuracy$correct <- accuracy[,1] == accuracy[,2]
+acc = sum(accuracy$correct)/length(accuracy$correct)
+
+# 6 subMacs, including 00:0f:a3:39:e1:c0
+offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:dd:cd`))
+online_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:dd:cd`))
+set.seed(123)
+trControl <- trainControl(method  = "cv", number  = 5)
+fit <- train(posXY ~ .,
+             method     = "knn",
+             tuneGrid   = expand.grid(k = seq(3,11,2)),
+             trControl  = trControl,
+             data       = offline_pivot_6,
+             na.action  = na.omit,
+             preProcess = c("center","scale")
+)
+predict = predict(fit, newdata=online_pivot, type="raw")
+accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot$posXY)))
+accuracy$correct <- accuracy[,1] == accuracy[,2]
+acc = sum(accuracy$correct)/length(accuracy$correct)
+
+# 6 subMacs, including 00:0f:a3:39:dd:cd
+offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:e1:c0`))
+oline_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:e1:c0`))
+set.seed(123)
+trControl <- trainControl(method  = "cv", number  = 5)
+fit <- train(posXY ~ .,
+             method     = "knn",
+             tuneGrid   = expand.grid(k = seq(3,11,2)),
+             trControl  = trControl,
+             data       = offline_pivot_6,
+             na.action  = na.omit,
+             preProcess = c("center","scale")
+)
+predict = predict(fit, newdata=online_pivot, type="raw")
+accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot$posXY)))
+accuracy$correct <- accuracy[,1] == accuracy[,2]
+acc = sum(accuracy$correct)/length(accuracy$correct)
+
+# multi-target regression
+
+# all 7 subMacs
+X <- cbind(offline_pivot_x_y$`00:14:bf:b1:97:8a`,offline_pivot_x_y$`00:14:bf:b1:97:90`,offline_pivot_x_y$`00:0f:a3:39:e1:c0`,offline_pivot_x_y$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y$`00:14:bf:b1:97:81`,offline_pivot_x_y$`00:14:bf:3b:c7:c6`,offline_pivot_x_y$`00:0f:a3:39:dd:cd`,offline_pivot_x_y$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=8, data=offline_pivot_x_y, scale=TRUE, validation="CV", segments=5)
+mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
+
+newX <- cbind(online_pivot_x_y$`00:14:bf:b1:97:8a`,online_pivot_x_y$`00:14:bf:b1:97:90`,online_pivot_x_y$`00:0f:a3:39:e1:c0`,online_pivot_x_y$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y$`00:14:bf:b1:97:81`,online_pivot_x_y$`00:14:bf:3b:c7:c6`,online_pivot_x_y$`00:0f:a3:39:dd:cd`,online_pivot_x_y$angle)
+predict <- predict(fit, ncomp=8, newdata=newX)
+predict_df <- as.data.frame(predict)
+names(predict_df) = c("posX","posY")
+mean_distance_error <- mean(sqrt((online_pivot_x_y$posX - predict_df$posX)^2+(online_pivot_x_y$posY - predict_df$posY)^2))
+
+# 6 subMacs, including 00:0f:a3:39:e1:c0
+X <- cbind(offline_pivot_x_y$`00:14:bf:b1:97:8a`,offline_pivot_x_y$`00:14:bf:b1:97:90`,offline_pivot_x_y$`00:0f:a3:39:e1:c0`,offline_pivot_x_y$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y$`00:14:bf:b1:97:81`,offline_pivot_x_y$`00:14:bf:3b:c7:c6`,offline_pivot_x_y$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y, scale=TRUE, validation="CV", segments=5)
+mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
+
+newX <- cbind(online_pivot_x_y$`00:14:bf:b1:97:8a`,online_pivot_x_y$`00:14:bf:b1:97:90`,online_pivot_x_y$`00:0f:a3:39:e1:c0`,online_pivot_x_y$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y$`00:14:bf:b1:97:81`,online_pivot_x_y$`00:14:bf:3b:c7:c6`,online_pivot_x_y$angle)
+predict <- predict(fit, ncomp=7, newdata=newX)
+predict_df <- as.data.frame(predict)
+names(predict_df) = c("posX","posY")
+mean_distance_error <- mean(sqrt((online_pivot_x_y$posX - predict_df$posX)^2+(online_pivot_x_y$posY - predict_df$posY)^2))
+
+# 6 subMacs, including 00:0f:a3:39:dd:cd
+X <- cbind(offline_pivot_x_y$`00:14:bf:b1:97:8a`,offline_pivot_x_y$`00:14:bf:b1:97:90`,offline_pivot_x_y$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y$`00:14:bf:b1:97:81`,offline_pivot_x_y$`00:14:bf:3b:c7:c6`,offline_pivot_x_y$`00:0f:a3:39:dd:cd`,offline_pivot_x_y$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y, scale=TRUE, validation="CV", segments=5)
+mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
+
+newX <- cbind(online_pivot_x_y$`00:14:bf:b1:97:8a`,online_pivot_x_y$`00:14:bf:b1:97:90`,online_pivot_x_y$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y$`00:14:bf:b1:97:81`,online_pivot_x_y$`00:14:bf:3b:c7:c6`,online_pivot_x_y$`00:0f:a3:39:dd:cd`,online_pivot_x_y$angle)
+predict <- predict(fit, ncomp=7, newdata=newX)
+predict_df <- as.data.frame(predict)
+names(predict_df) = c("posX","posY")
+mean_distance_error <- mean(sqrt((online_pivot_x_y$posX - predict_df$posX)^2+(online_pivot_x_y$posY - predict_df$posY)^2))
+```
+
+# Introduction
+
+This case study explores the data captured by real time location systems (RLTS). The data provided indicates the signal strength, as measured in decibels (dB) by a hand-held device, from various fixed access points. Both the scanning devices and the fixed devices are identified in the data by their media access control (MAC) addresses. k-NN classification is used to classify a location. This is done by combining X and Y coordinates into a single variable for classification. Due to drawbacks that are discussed later, a multi-target regression model is also run.
+
+Section 2 gives some background on the dataset. Section 3 goes into detail about the dataset, data cleanup and the models used. Next, in Section 4 the results for the models are reviewed. Section 5 highlights some drawbacks of using k-NN classification for RLTS and Section 6 concludes this case study.
+
+# Background
+
+RTLS are ubiquitous with modern technology. Your phone knows where you are and can give directions to other locations based off your current location. You can locate someone else's phone, your car, your keys even. Global Positioning Systems (GPS) are a primary location mechanism, but primarily work outdoors. Using wireless signal strength between a hand-held device and a fixed device is one way to identify location inside a building, where GPS does not work.
+
+# Methods
+
+## Dataset
+
+The dataset used in this case study contains 914,951 signal strength readings from one floor of a building at the University of Mannheim. There are 6 fixed access points where the signal strength is measured from hand-held devices. 166 different spots were selected for the hand-held devices to record signal strength. At each of these 166 spots measurements were taken at different angles. There were 9 possible angles, each spaced 45 degrees apart.
+
+The data is organized as a text file with each line representing a measurement event. An example line and each variable recorded are shown below.
+
+```{r txt}
+# this is the first non-comment line in the text file
+txt = readLines('../Data/offline.final.trace.txt')
+txt[4]
+```
+
+`Table 1` presents details about the variables that are available in the dataset.
+
+Table 1: Dataset Variables
+
+| Variable        | Description | 
+| ------- |-------------| 
+| time | Time the measurement was taken in milliseconds from January 1, 1970. | 
+| id | Scanning device's MAC Address id. All measurements are taken by the same scanning device: `00:02:2D:21:0F:33`. |
+| pos | 3 position measurements: posX, posY, and posZ. posZ is always zero. |
+| degree | Orientation of the scanning device in degrees. |
+| Recorded Measurement - MAC Address | First value in the field indicating the MAC address access point. |
+| Recorded Measurement - Signal | Second value in the field indicating the signal strength measured in dB. |
+| Recorded Measurement - Channel | Third value in the field indicating the channel frequency. |
+| Recorded Measurement - Access Point Type | Fourth value in the field indicating the access point type. 1 = adhoc device. 3 = fixed access point. |
+
+## Dataset Cleanup
+
+Data cleanup is necessary to be able to use this text file. What follows in this section is a discussion of the data clean-up steps taken.
+
+A quick review of the textfile provided shows that there are lines that begin with `#`. These lines are comments and should not be included in the final dataset. They are removed before further processing the data.
+
+Next, a function is applied to parse the data from a sting into columns. The last 4 columns are the `Recorded Measurements` and are pulled out first. These columns do not have variable names included in the textfile. Included within the first 10 columns is a variable name and its value. Columns 2, 4, 6:8 and 10 are data values and are kept. The remaining columns are discarded. The resulting dataset is converted to a dataframe and variable names are added.
+
+There are some records in the dataset that are from adhoc access points. Due to information provided in the textbook, these records have been removed because they are not of interest.
+
+As noted in `Table 1` there are several variables that have the same value throughout the dataset: `id`, `posZ` and `channel frequency`. Also, since adhoc access points were filtered out of the dataset, `access point type` also has the same value throughout the dataset. These variables are dropped.
+
+The textbook noted that there are only 6 actual access points, however more are found in the dataset. Only the top 7 addresses by frequency will be considered in this analysis. `Table 2` displays the MAC address access point and frequency for the top 7 access points. The dataset is filtered to only include these 7 MAC addresses.
+
+Table 2: MAC Address Access Point Frequency
+
+| MAC | Frequency | 
+| - |------| 
+| 00:0f:a3:39:e1:c0 | 145,862 | 
+| 00:0f:a3:39:dd:cd | 145,619 |
+| 00:14:bf:b1:97:8a | 132,962 |
+| 00:14:bf:3b:c7:c6 | 126,529 |
+| 00:14:bf:b1:97:90 | 122,315 |
+| 00:14:bf:b1:97:8d | 121,325 |
+| 00:14:bf:b1:97:81 | 120,339 |
+
+Data types also need to be corrected. `time`, `posX`, `posY`, `orientation`, and `signal` are converted to numeric. `time` is further converted to datetime. `degree` is also adjusted by rounding to the nearest 45 degree increment.
+
+Each measurement event can be uniquely identified by the time, position, and orientation of the scanning device. However, our initial processing of the text file created a "long" dataframe that had multiple rows for each unique event. Each row represents a measurement for one of the 7 fixed access devices. The dataframe is transposed from "long" to "wide" to make each row a unique event. The resulting dataframe has 7 new variables, each representing a fixed access device's measurement.
+
+A review of the resulting dataframes show that there are missing values for some measurements. The models described in the next section require the data to not have missing values. The option chosen here to handle missing values is to impute them. -100 is used as the dB measurement whenever a missing value is encountered because it was sufficiently far enough away from the range of existing values. Dropping records with missing values was considered, but a significant amount of data was dropped with this method.
+
+The k-NN classification model will also require a singular categorical target variable. `posX` and `posY` are concatenated together into `posXY`, where the X and Y values are separated by a hyphen. At this point, a copy of the dataframe is made. One copy (offline_pivot) will be used for k-NN classification and the other copy (offline_pivot_x_y) will be used for multi-target regression. The reason for creating 2 datasets is that the same set of variables is not needed for each model. `posXY` is needed for k-NN classification, but `posX` and `posY` are needed for multi-target regression. Other variables that do not provide any extra value for modeling are dropped: `time`, `rawTime` and `orientation` (using the rounded `angle` instead).
+
+The steps outlined above are used both on the offline textfile (training) and the online textfile (test). There is an extra step taken for the online dataset. For k-NN classification, the same target variables need to be in the training and test datasets. The online dataset has coordinates with decimal places and the offline dataset were integers. Therefore, `posX` and `posY` were rounded to the nearest integer. These rounded positions will be used for k-NN classification. The exact positions will be used for multi-target regression.
+
 ## Modeling  
 
 The goal of this case study is to use the offline data to predict the x-y location of the online data. Two methods are applied towards this end: k-NN classification and multi-target regression. 
@@ -222,9 +321,11 @@ k-NN classification is used to predict the categorical variable `posXY`, which c
 
 ### Multi-Target Regression  
 
-A drawback for using a classification modeling technique for this dataset is that combinations of X and Y that are found in the test dataset, but not the training dataset, do not have the chance of being classified correctly. A classification model can only classify observations based on the classes available in the training dataset. The training dataset provided had all X and Y values rounded to the nearest integer. The test dataset had many unrounded values. This issue and the fact that we really have 2 target variables (X and Y), lead us to research multi-target regression models.  
+A drawback for using a classification modeling technique for this dataset is that combinations of X and Y that are found in the test dataset, but not the training dataset, do not have the chance of being classified correctly. A classification model can only classify observations based on the classes available in the training dataset. The training dataset provided had all X and Y values rounded to the nearest integer. The test dataset had many unrounded values. This issue and the fact that there are 2 target variables (X and Y), lead us to research multi-target regression models.  
 
-The pls package in R provides a multi-target Partial Least Squares Regression model.  Partial Least Squares decomposes a matrix of independent variables X and a matrix of target variables Y. While we could have evaluated the number of optimal components needed for the problem here, we choose to force the model to include all components (or variables). The ability to use a matrix Y is what we focus on.
+The pls package in R provides a multi-target Partial Least Squares Regression model.  Partial Least Squares decomposes a matrix of independent variables X and a matrix of target variables Y. While the number of optimal components could have been evaluated, for the problem here the model is forced to include all components (or variables). The ability to use a matrix Y is what is focused on.
+
+More drawbacks to k-NN classification are discussed in Section 5.
 
 ### K-fold cross validation  
 
@@ -240,13 +341,13 @@ The textbook included mac address 00:0f:a3:39:e1:c0 and excluded 00:0f:a3:39:dd:
 
 Table 3: k-NN Classification Accuracies
 
-| MAC Address | k=3 | k=5 | k=7| k=9 | k=11 | Selected K |
+| MAC Address | k=3 | k=5 | k=7| k=9 | k=11 | Selected K | Test Dataset Accuracy |
 | - | - | - | - | - | - | - |
-| Keep 00:0f:a3:39:e1:c0 | 50.07% | 49.44% | 48.23% | 46.74% | 45.56% | k=3 |
-| Keep 00:0f:a3:39:dd:cd | 49.87% | 49.46% | 48.19% | 46.91% | 45.90% | k=3 |
-| Keep all 7 | 52.96% | 51.93% | 50.55% | 49.15% | 47.87% | k=3 |
+| Keep 00:0f:a3:39:e1:c0 | 50.07% | 49.44% | 48.23% | 46.74% | 45.56% | k=3 | |
+| Keep 00:0f:a3:39:dd:cd | 49.87% | 49.46% | 48.19% | 46.91% | 45.90% | k=3 | |
+| Keep all 7 | 52.96% | 51.93% | 50.55% | 49.15% | 47.87% | k=3 | |
 
-Keeping 00:0f:a3:39:e1:c0 turns out to be the better choice, when attempting to decide between 00:0f:a3:39:e1:c0 and 00:0f:a3:39:dd:cd. With K=5 an accuracy of 72.13% is achieved. 6 mac addresses were chosen because of information provided about the dataset. However, using all mac addresses and 3 neighbors achieves a higher accuracy of 75.58%. It would be advisable to discuss this finding with the data provider. If there are truly only 6 mac addresses it would not be appropriate to use all 7.  
+Keeping 00:0f:a3:39:e1:c0 turns out to be the better choice, when attempting to decide between 00:0f:a3:39:e1:c0 and 00:0f:a3:39:dd:cd. With K=5 an accuracy of 72.13% is achieved. 6 mac addresses were chosen because of information provided about the dataset. However, using all mac addresses and 3 neighbors achieves a higher accuracy of 75.58%. It would be advisable to discuss this finding with the data provider. If there are truly only 6 MAC addresses it would not be appropriate to use all 7.  
 
 ## Multi-Target Regression
 
@@ -258,110 +359,50 @@ Table 4: Multi-Target Regression Mean Distance Error
 | Keep 00:0f:a3:39:dd:cd | 11.60 | 10.50 |
 | Keep all 7 | 12.73 | 10.52 |
 
-## Model Code  
+```{r plots}
+## This is a function to plot the actual vs predicted pairs, joining them with a line to easily see errors
+## 100 sample points are used so as clearly see the errors.
+## actual should be a two column data frame with columns "posX" and "posY"
+## predicted should be a two column data frame with columns "posX" and "posY"
+## sample is the number of pairs to display in the graph
+## seed is used when sampling the data
+## the function with return a ggplot object
+plot_distances <- function(actual_orig, predicted_orig, sample = 100, seed = 314) {
 
-```{r}
-# all 7 subMacs
-set.seed(123)
-trControl <- trainControl(method  = "cv", number  = 5)
-fit <- train(posXY ~ .,
-             method     = "knn",
-             tuneGrid   = expand.grid(k = seq(3,11,2)),
-             trControl  = trControl,
-             data       = offline_pivot,
-             preProcess = c("center","scale")
-             )
-fit
-predict = predict(fit, newdata=online_pivot, type="raw")
-accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot$posXY)))
-accuracy$correct <- accuracy[,1] == accuracy[,2]
-sum(accuracy$correct)/length(accuracy$correct)
+  actual <- actual_orig
+  predicted <- predicted_orig
+  
+  actual$name <- "actual"
+  actual$obs <- seq(1,dim(actual)[1],1)
+  predicted$name <- "predicted"
+  predicted$obs <- seq(1,dim(predicted)[1],1)
 
-# 6 subMacs, including 00:0f:a3:39:e1:c0
-offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:dd:cd`))
-online_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:dd:cd`))
-set.seed(123)
-trControl <- trainControl(method  = "cv", number  = 5)
-fit <- train(posXY ~ .,
-             method     = "knn",
-             tuneGrid   = expand.grid(k = seq(3,11,2)),
-             trControl  = trControl,
-             data       = offline_pivot_6,
-             na.action  = na.omit,
-             preProcess = c("center","scale")
-)
-fit
-predict = predict(fit, newdata=online_pivot, type="raw")
-accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot$posXY)))
-accuracy$correct <- accuracy[,1] == accuracy[,2]
-sum(accuracy$correct)/length(accuracy$correct)
+  plot_data <- rbind(actual,predicted)
+  set.seed(seed)
+  sample_index <- sample(seq(1,length(actual$name),1),sample)
+  plot_data_sample <- plot_data %>% filter(obs %in% sample_index)
+  
+  p <- ggplot(plot_data_sample,aes(x=posX,y=posY)) + geom_point(aes(color=name)) + geom_line(aes(group=obs))
+  return(p)
+}
+p <- plot_distances(online_pivot_x_y[,c("posX","posY")],predict_df[,c("posX","posY")])
 
-# 6 subMacs, including 00:0f:a3:39:dd:cd
-offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:e1:c0`))
-oline_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:e1:c0`))
-set.seed(123)
-trControl <- trainControl(method  = "cv", number  = 5)
-fit <- train(posXY ~ .,
-             method     = "knn",
-             tuneGrid   = expand.grid(k = seq(3,11,2)),
-             trControl  = trControl,
-             data       = offline_pivot_6,
-             na.action  = na.omit,
-             preProcess = c("center","scale")
-)
-fit
-predict = predict(fit, newdata=online_pivot, type="raw")
-accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot$posXY)))
-accuracy$correct <- accuracy[,1] == accuracy[,2]
-sum(accuracy$correct)/length(accuracy$correct)
+caption <- "Figure Z: This plot shows the differences between actual and predicted 
+values for model XYZ. We can see the model mostly predicts in the middle region,  
+and the larger errors are associated with observations with high or low Y values"
+caption <- paste0(strwrap(caption, 80), sep="", collapse="\n")
 
-# multi-target regression
-
-# all 7 subMacs
-X <- cbind(offline_pivot_x_y$`00:14:bf:b1:97:8a`,offline_pivot_x_y$`00:14:bf:b1:97:90`,offline_pivot_x_y$`00:0f:a3:39:e1:c0`,offline_pivot_x_y$`00:14:bf:b1:97:8d`,
-           offline_pivot_x_y$`00:14:bf:b1:97:81`,offline_pivot_x_y$`00:14:bf:3b:c7:c6`,offline_pivot_x_y$`00:0f:a3:39:dd:cd`,offline_pivot_x_y$angle)
-fit <- plsr(cbind(posX,posY) ~ X, ncomp=8, data=offline_pivot_x_y, scale=TRUE, validation="CV", segments=5)
-mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
-mean_distance_error
-
-newX <- cbind(online_pivot_x_y$`00:14:bf:b1:97:8a`,online_pivot_x_y$`00:14:bf:b1:97:90`,online_pivot_x_y$`00:0f:a3:39:e1:c0`,online_pivot_x_y$`00:14:bf:b1:97:8d`,
-              online_pivot_x_y$`00:14:bf:b1:97:81`,online_pivot_x_y$`00:14:bf:3b:c7:c6`,online_pivot_x_y$`00:0f:a3:39:dd:cd`,online_pivot_x_y$angle)
-predict <- predict(fit, ncomp=8, newdata=newX)
-predict_df <- as.data.frame(predict)
-names(predict_df) = c("posX","posY")
-mean_distance_error <- mean(sqrt((online_pivot_x_y1$posX - predict_df$posX)^2+(online_pivot_x_y1$posY - predict_df$posY)^2))
-mean_distance_error
-
-# 6 subMacs, including 00:0f:a3:39:e1:c0
-X <- cbind(offline_pivot_x_y$`00:14:bf:b1:97:8a`,offline_pivot_x_y$`00:14:bf:b1:97:90`,offline_pivot_x_y$`00:0f:a3:39:e1:c0`,offline_pivot_x_y$`00:14:bf:b1:97:8d`,
-           offline_pivot_x_y$`00:14:bf:b1:97:81`,offline_pivot_x_y$`00:14:bf:3b:c7:c6`,offline_pivot_x_y$angle)
-fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y, scale=TRUE, validation="CV", segments=5)
-mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
-mean_distance_error
-
-newX <- cbind(online_pivot_x_y$`00:14:bf:b1:97:8a`,online_pivot_x_y$`00:14:bf:b1:97:90`,online_pivot_x_y$`00:0f:a3:39:e1:c0`,online_pivot_x_y$`00:14:bf:b1:97:8d`,
-              online_pivot_x_y$`00:14:bf:b1:97:81`,online_pivot_x_y$`00:14:bf:3b:c7:c6`,online_pivot_x_y$angle)
-predict <- predict(fit, ncomp=7, newdata=newX)
-predict_df <- as.data.frame(predict)
-names(predict_df) = c("posX","posY")
-mean_distance_error <- mean(sqrt((online_pivot_x_y1$posX - predict_df$posX)^2+(online_pivot_x_y1$posY - predict_df$posY)^2))
-mean_distance_error
-
-
-# 6 subMacs, including 00:0f:a3:39:dd:cd
-X <- cbind(offline_pivot_x_y$`00:14:bf:b1:97:8a`,offline_pivot_x_y$`00:14:bf:b1:97:90`,offline_pivot_x_y$`00:14:bf:b1:97:8d`,
-           offline_pivot_x_y$`00:14:bf:b1:97:81`,offline_pivot_x_y$`00:14:bf:3b:c7:c6`,offline_pivot_x_y$`00:0f:a3:39:dd:cd`,offline_pivot_x_y$angle)
-fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y, scale=TRUE, validation="CV", segments=5)
-mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
-mean_distance_error
-
-newX <- cbind(online_pivot_x_y$`00:14:bf:b1:97:8a`,online_pivot_x_y$`00:14:bf:b1:97:90`,online_pivot_x_y$`00:14:bf:b1:97:8d`,
-              online_pivot_x_y$`00:14:bf:b1:97:81`,online_pivot_x_y$`00:14:bf:3b:c7:c6`,online_pivot_x_y$`00:0f:a3:39:dd:cd`,online_pivot_x_y$angle)
-predict <- predict(fit, ncomp=7, newdata=newX)
-predict_df <- as.data.frame(predict)
-names(predict_df) = c("posX","posY")
-mean_distance_error <- mean(sqrt((online_pivot_x_y1$posX - predict_df$posX)^2+(online_pivot_x_y1$posY - predict_df$posY)^2))
-mean_distance_error
+p + labs(title="Figure Z: Error Plot for Model XYZ", 
+         caption= caption,
+         colow = "Group") +
+         xlab("X Position") +
+         ylab("Y Position") +
+  theme(plot.caption = element_text(hjust = 0, face= "italic"),
+ #       plot.title.position = "plot",
+        legend.title = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))
+caption
 ```
 
 # Drawbacks and Alternatives  
