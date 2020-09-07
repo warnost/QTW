@@ -1,0 +1,361 @@
+---
+title: "Case Study - Real Time Location Systems"
+date: "`r Sys.Date()`"
+author: "Allison Roderick, Jenna Ford, William Arnost"
+output:
+  rmdformats::readthedown:
+    number_sections: true
+    code_folding: hide
+    highlight: kate
+    toc_depth: 3
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE, include=FALSE}
+library(knitr)
+library(rmdformats)
+library(formatR)
+
+library(tidyverse)
+library(magrittr)
+library(caret)
+library(pls)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Introduction
+
+This case study explores the data captured by real time location systems (RLTS). The data provided indicates the signal strength, as measured in decibels (dB) by a hand-held device, of various fixed access points. Both the scanning devices and the fixed devices are identified in the data by their media access control (MAC) addresses. knn classification is used to classify a location. This is done by combining X and Y coordinates into a single variable for classification. Drawbacks...We also use a multi-target regression....
+
+# Background
+
+Background on dataset from text.
+
+# Methods
+
+## Dataset
+
+The data is organized as a text file with each line representing a measurement event. An example line and each variable recorded are shown below.
+
+```{r txt}
+# this is the first non-comment line in the text file
+txt = readLines('../Data/offline.final.trace.txt')
+txt[4]
+```
+
+`Table 1` presents details about the variables that are available in the dataset.
+
+Table 1: Dataset Variables
+
+| Variable        | Description | 
+| ------- |-------------| 
+| time | Time the measurement was taken in milliseconds from January 1, 1970. | 
+| id | Scanning device's MAC Address id. All measurements are taken by the same scanning device: `00:02:2D:21:0F:33`. |
+| pos | 3 position measurements: posX, posY, and posZ. posZ is always zero. |
+| degree | Orientation of the scanning device in degrees. |
+| Recorded Measurement - MAC Address | First value in the field indicating the MAC address access point. |
+| Recorded Measurement - Signal | Second value in the field indicating the signal strength measured in dB. |
+| Recorded Measurement - Channel | Third value in the field indicating the channel frequency. |
+| Recorded Measurement - Access Point Type | Fourth value in the field indicating the access point type. 1 = adhoc device. 3 = fixed access point. |
+
+## Dataset Cleanup
+
+```{r datapull1, echo=FALSE}
+processLine = function(x){
+  tokens = strsplit(x, "[;=,]")[[1]]
+  
+  if (length(tokens) == 10) 
+    return(NULL)
+ 
+  # keep the last 4 columns related to measurements
+  tmp = matrix(tokens[ - (1:10) ], ncol= 4, byrow = TRUE)
+  # don't include columns 1, 3, 4, 9 because these are variable names
+  cbind(matrix(tokens[c(2, 4, 6:8, 10)], nrow(tmp), 6, byrow = TRUE), tmp)
+}
+
+
+roundOrientation = function(angles) {
+  refs = seq(0, by = 45, length  = 9)
+  q = sapply(angles, function(o) which.min(abs(o - refs)))
+  c(refs[1:8], 0)[q]
+}
+
+readData = function(filename = '../Data/offline.final.trace.txt', 
+           subMacs = c("00:0f:a3:39:e1:c0", "00:0f:a3:39:dd:cd", "00:14:bf:b1:97:8a",
+                       "00:14:bf:3b:c7:c6", "00:14:bf:b1:97:90", "00:14:bf:b1:97:8d",
+                       "00:14:bf:b1:97:81"))  {
+    txt = readLines(filename)
+    
+    #remove comments
+    lines = txt[ substr(txt, 1, 1) != "#" ]
+    
+    #apply function to read and parse data
+    tmp = lapply(lines, processLine)
+    offline = as.data.frame(do.call("rbind", tmp), 
+                            stringsAsFactors= FALSE) 
+    
+    names(offline) = c("time", "scanMac", 
+                       "posX", "posY", "posZ", "orientation", 
+                       "mac", "signal", "channel", "type")
+    
+     # keep only signals from access points
+    offline = offline[ offline$type == "3", ]
+    
+    # drop scanMac, posZ, channel, and type - no info in them
+    dropVars = c("scanMac", "posZ", "channel", "type")
+    offline = offline[ , !( names(offline) %in% dropVars ) ]
+    
+    # drop more unwanted access points
+    offline = offline[ offline$mac %in% subMacs, ]
+    
+    # convert numeric values
+    numVars = c("time", "posX", "posY", "orientation", "signal")
+    offline[ numVars ] = lapply(offline[ numVars ], as.numeric)
+
+    # convert time to POSIX
+    offline$rawTime = offline$time
+    offline$time = offline$time/1000
+    class(offline$time) = c("POSIXt", "POSIXct")
+    
+    # round orientations to nearest 45
+    offline$angle = roundOrientation(offline$orientation)
+      
+    return(offline)
+  }
+
+offline = readData(filename = '../Data/offline.final.trace.txt')
+subMacs = names(sort(table(offline$mac), decreasing = TRUE))
+online = readData(filename = '../Data/online.final.trace.txt')
+online$posXY_round = paste(round(online$posX,digits=0), round(online$posY,digits=0), sep = "-")
+online$posXY_round <- as.factor(online$posXY_round)
+
+# investigating frequency of measurements by mac address
+vals = data.frame(table(mac=offline['mac']))
+#vals[order(-vals$Freq),] #used table 2 instead
+```
+
+Data cleanup is necessary to be able to use this text file. What follows in this section is a discussion of the data clean-up steps taken.
+
+A quick review of the textfile provided shows that there are lines that begin with `#`. These lines are comments and should not be included in the final dataset. They are removed before further processing the data.
+
+Next, a function is applied to parse the data from a sting into columns. The last 4 columns are the `Recorded Measurements` and are pulled out first. These columns do not have variable names included in the textfile. Included within the first 10 columns is a variable name and its value. Columns 2, 4, 6:8 and 10 are data values and are kept. The remaining columns are discarded. The resulting dataset is converted to a dataframe and variable names are added.
+
+There are some records in the dataset that are from adhoc access points. Due to information provided in the textbook, these records have been removed because they are not of interest.
+
+As noted in `Table 1` there are several variables that have the same value throughout the dataset: `id`, `posZ` and `channel frequency`. Also, since adhoc access points were filtered out of the dataset, `access point type` also has the same value throughout the dataset. These variables are dropped.
+
+The textbook noted that there are only 6 actual access points, however more are found in the dataset. Only the top 7 addresses by frequency will be considered in this analysis. `Table 2` displays the MAC address access point and frequency for the top 7 access points. The dataset is filtered to only include these 7 MAC addresses.
+
+Table 2: MAC Address Access Point Frequency
+
+| MAC | Frequency | 
+| - |------| 
+| 00:0f:a3:39:e1:c0 | 145,862 | 
+| 00:0f:a3:39:dd:cd | 145,619 |
+| 00:14:bf:b1:97:8a | 132,962 |
+| 00:14:bf:3b:c7:c6 | 126,529 |
+| 00:14:bf:b1:97:90 | 122,315 |
+| 00:14:bf:b1:97:8d | 121,325 |
+| 00:14:bf:b1:97:81 | 120,339 |
+
+Data types also need to be corrected. `time`, `posX`, `posY`, `orientation`, and `signal` are converted to numeric. `time` is further converted to datetime. `degree` is also adjusted by rounding to the nearest 45 degree increment.
+
+The steps outline above are used both on the offline textfile (training) and the online textfile (test). 
+
+Each measurement event can be uniquely identified by the time, position, and orientation of the scanning device. However, our initial processing of the text file created a "long" dataframe that had multiple rows for each unique event--one row for each of the up to 7 fixed access devices at which the measurement was recorded. We then transposed the data from "long" to "wide", in order to make each row a unique event, with 7 new variables, each representing a fixed access device's measurement.
+
+
+``` {r datapull2}
+
+# format signal stength as an integer
+offline$signal %<>% as.integer
+online$signal %<>% as.integer
+
+# remove channel and scanMac as they have no bearing on the analysis
+# transpose long to wide so each of the 7 macs has a column
+offline_pivot<-offline %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
+online_pivot<- online %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
+
+# check for nas
+offline_pivot$nas<-rowSums(is.na(offline_pivot))
+
+# remove nas
+offline_pivot = offline_pivot[offline_pivot$nas==0,]
+
+# create categorical variable representing the x-y position 
+offline_pivot$posXY = paste(offline_pivot$posX, offline_pivot$posY, sep = "-")
+online_pivot$posXY = paste(online_pivot$posX, online_pivot$posY, sep = "-")
+
+```
+
+# Modeling  
+
+## K-fold cross validation  
+
+Cross validation allows us to test our model on data it hasn't seen, to see how well the model performs when making predictions. Using cross validation can help identify if the model is overfitting the training data. When splitting data into training and test datasets there is a concern that important patterns found in the data may be left out of the training dataset. If these patterns are not present in the training dataset, the model won't be able to predict them in the test dataset. K-fold cross validation takes this into account by dividing the data into k folds. K-1 folds are used to train the model and the remaining fold is used for testing. This is repeated for k-1 models and every fold is used for testing once. This reduces bias and variance since we are essentially using the entire dataset for training and testing. We have chosen 5-folds for this project, a typical value chosen.  
+
+## Results for knn classification  
+
+The textbook included mac address 00:0f:a3:39:e1:c0 and excluded 00:0f:a3:39:dd:cd. The reasoning found in the text indicates that these 2 have similar heat maps, indicating they are located close to one another. The first one (00:0f:a3:39:e1:c0) is chosen and 00:0f:a3:39:dd:cd is discarded. Our task was to determine if discarding 00:0f:a3:39:e1:c0 was the correct choice to make.
+The table below shows results from running knn with 5-fold cross validation for different numbers of nearest neighbors. We selected to only run odd values of K to ensure there are no issues with a tie. We also chose to not run a value of one for K. This is to minimize the possibility of overfitting.  
+
+*Table*    
+
+Keeping 00:0f:a3:39:e1:c0 turns out to be the better choice, when attempting to decide between 00:0f:a3:39:e1:c0 and 00:0f:a3:39:dd:cd. With K=5 an accuracy of 72.13% is achieved. 6 mac addresses were chosen because of information provided about the dataset. However, using all mac addresses and 3 neighbors achieves a higher accuracy of 75.58%. It would be advisable to discuss this finding with the data provider. If there are truly only 6 mac addresses it would not be appropriate to use all 7.  
+
+## Multi-Target Regression  
+
+A drawback for using a classification modeling technique for this dataset is that combinations of X and Y that are found in the test dataset, but not the training dataset, do not have the change of being classified correctly. A classification model can only classify observations based on the classes available in the training dataset. The training dataset provided had all X and Y values rounded to the nearest integer. The test dataset had many unrounded values. This issue and the fact that we really have 2 target variables (X and Y), lead us to research multi-target regression models.  
+
+*Table 2*
+
+## Model Code  
+```{r model_processing}
+
+offline_pivot_x_y = offline_pivot
+offline_pivot = select(offline_pivot,-c(posX, posY, time, orientation, rawTime, nas))
+offline_pivot_x_y = select(offline_pivot_x_y,-c(posXY, time, orientation))
+head(offline_pivot)
+
+vals = data.frame(table(online['mac']))
+vals[order(-vals$Freq),]
+
+online_pivot_x_y = online_pivot
+online_pivot = select(online_pivot,-c(posX, posY,time,orientation, rawTime))
+online_pivot_x_y = select(online_pivot_x_y,-c(posXY, time,orientation))
+head(online_pivot)
+
+```
+
+```{r}
+# all 7 subMacs
+set.seed(123)
+trControl <- trainControl(method  = "cv", number  = 5)
+fit <- train(posXY ~ .,
+             method     = "knn",
+             tuneGrid   = expand.grid(k = seq(3,11,2)),
+             trControl  = trControl,
+             data       = offline_pivot,
+             na.action  = na.omit,
+             preProcess = c("center","scale")
+             )
+fit
+#online_pivot_round = select(online_pivot,-c(posXY))
+#online_pivot_round %>% rename(posXY = posXY_round)
+#predict = predict(fit, newdata=online_pivot_round, type="class")
+#confusionMatrix(predict,online_pivot$posXY)
+
+# 6 subMacs, including 00:0f:a3:39:e1:c0
+offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:dd:cd`))
+oline_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:dd:cd`))
+set.seed(123)
+trControl <- trainControl(method  = "cv", number  = 5)
+fit <- train(posXY ~ .,
+             method     = "knn",
+             tuneGrid   = expand.grid(k = seq(3,11,2)),
+             trControl  = trControl,
+             data       = offline_pivot_6,
+             na.action  = na.omit,
+             preProcess = c("center","scale")
+)
+fit
+#online_pivot_round = select(oline_pivot_6,-c(posXY))
+#online_pivot_round %>% rename(posXY = posXY_round)
+#predict = predict(fit, newdata=online_pivot_round, type="class")
+
+
+# 6 subMacs, including 00:0f:a3:39:dd:cd
+offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:e1:c0`))
+oline_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:e1:c0`))
+set.seed(123)
+trControl <- trainControl(method  = "cv", number  = 5)
+fit <- train(posXY ~ .,
+             method     = "knn",
+             tuneGrid   = expand.grid(k = seq(3,11,2)),
+             trControl  = trControl,
+             data       = offline_pivot_6,
+             na.action  = na.omit,
+             preProcess = c("center","scale")
+)
+fit
+#online_pivot_round = select(oline_pivot_6,-c(posXY))
+#online_pivot_round %>% rename(posXY = posXY_round)
+#predict = predict(fit, newdata=online_pivot_round, type="class")
+
+
+# multi-target regression
+
+
+# all 7 subMacs
+offline_pivot_x_y1 <- na.omit(offline_pivot_x_y)
+X <- cbind(offline_pivot_x_y1$`00:14:bf:b1:97:8a`,offline_pivot_x_y1$`00:14:bf:b1:97:90`,offline_pivot_x_y1$`00:0f:a3:39:e1:c0`,offline_pivot_x_y1$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y1$`00:14:bf:b1:97:81`,offline_pivot_x_y1$`00:14:bf:3b:c7:c6`,offline_pivot_x_y1$`00:0f:a3:39:dd:cd`,offline_pivot_x_y1$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=8, data=offline_pivot_x_y1, scale=TRUE, validation="CV", segments=5)
+mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
+mean_distance_error
+
+online_pivot_x_y1 <- na.omit(online_pivot_x_y)
+newX <- cbind(online_pivot_x_y1$`00:14:bf:b1:97:8a`,online_pivot_x_y1$`00:14:bf:b1:97:90`,online_pivot_x_y1$`00:0f:a3:39:e1:c0`,online_pivot_x_y1$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y1$`00:14:bf:b1:97:81`,online_pivot_x_y1$`00:14:bf:3b:c7:c6`,online_pivot_x_y1$`00:0f:a3:39:dd:cd`,online_pivot_x_y1$angle)
+predict <- predict(fit, ncomp=8, newdata=newX)
+predict_df <- as.data.frame(predict)
+names(predict_df) = c("posX","posY")
+mean_distance_error <- mean(sqrt((online_pivot_x_y1$posX - predict_df$posX)^2+(online_pivot_x_y1$posY - predict_df$posY)^2))
+mean_distance_error
+
+# 6 subMacs, including 00:0f:a3:39:e1:c0
+offline_pivot_x_y1 <- na.omit(offline_pivot_x_y)
+X <- cbind(offline_pivot_x_y1$`00:14:bf:b1:97:8a`,offline_pivot_x_y1$`00:14:bf:b1:97:90`,offline_pivot_x_y1$`00:0f:a3:39:e1:c0`,offline_pivot_x_y1$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y1$`00:14:bf:b1:97:81`,offline_pivot_x_y1$`00:14:bf:3b:c7:c6`,offline_pivot_x_y1$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y1, scale=TRUE, validation="CV", segments=5)
+mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
+mean_distance_error
+
+online_pivot_x_y1 <- na.omit(online_pivot_x_y)
+newX <- cbind(online_pivot_x_y1$`00:14:bf:b1:97:8a`,online_pivot_x_y1$`00:14:bf:b1:97:90`,online_pivot_x_y1$`00:0f:a3:39:e1:c0`,online_pivot_x_y1$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y1$`00:14:bf:b1:97:81`,online_pivot_x_y1$`00:14:bf:3b:c7:c6`,online_pivot_x_y1$angle)
+predict <- predict(fit, ncomp=7, newdata=newX)
+predict_df <- as.data.frame(predict)
+names(predict_df) = c("posX","posY")
+mean_distance_error <- mean(sqrt((online_pivot_x_y1$posX - predict_df$posX)^2+(online_pivot_x_y1$posY - predict_df$posY)^2))
+mean_distance_error
+
+
+# 6 subMacs, including 00:0f:a3:39:dd:cd
+offline_pivot_x_y1 <- na.omit(offline_pivot_x_y)
+X <- cbind(offline_pivot_x_y1$`00:14:bf:b1:97:8a`,offline_pivot_x_y1$`00:14:bf:b1:97:90`,offline_pivot_x_y1$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y1$`00:14:bf:b1:97:81`,offline_pivot_x_y1$`00:14:bf:3b:c7:c6`,offline_pivot_x_y1$`00:0f:a3:39:dd:cd`,offline_pivot_x_y1$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y1, scale=TRUE, validation="CV", segments=5)
+mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
+mean_distance_error
+
+online_pivot_x_y1 <- na.omit(online_pivot_x_y)
+newX <- cbind(online_pivot_x_y1$`00:14:bf:b1:97:8a`,online_pivot_x_y1$`00:14:bf:b1:97:90`,online_pivot_x_y1$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y1$`00:14:bf:b1:97:81`,online_pivot_x_y1$`00:14:bf:3b:c7:c6`,online_pivot_x_y1$`00:0f:a3:39:dd:cd`,online_pivot_x_y1$angle)
+predict <- predict(fit, ncomp=7, newdata=newX)
+predict_df <- as.data.frame(predict)
+names(predict_df) = c("posX","posY")
+mean_distance_error <- mean(sqrt((online_pivot_x_y1$posX - predict_df$posX)^2+(online_pivot_x_y1$posY - predict_df$posY)^2))
+mean_distance_error
+```
+
+# Drawbacks and Alternatives  
+
+KNN has several drawbacks for predicting real time location. The model is not easily transferable without the training data, its speed decreases with more observations, and it could have difficulty with outliers.  
+
+KNN predictions are made by comparing a point to its closest neighbors then determining its location by either voting or an average of its neighbors’ locations. This means you must have other data points to make a prediction. If the training set is large, it would need to be copied to every location where the model would need to be run. If it is running on a single server somewhere that might not be an issue, but if it is running on user’s cell phones that might make the transfer time consuming and the storage cost to the user might be prohibitive. 
+Large training set sizes could also be an issue when it comes time to compute the prediction. The more observations in the training set, the more need to be searched through to find the nearest neighbors, increasing prediction time. The cost of this would be dependent on the use case. If it is merely observational, perhaps a few seconds difference might not matter. But it a decision needs to be made quickly based on location, then it could be a significant problem. For instance, if a robotic currier needed to decide where to turn based on its location, or trying to intercept an item moving through a storage facility.  
+
+Finally, there could be issues with outliers or irregular spaces. A new data point far outside the space would be placed by the average of its three closest neighbors, which could be far away from its actual location. I think that would manifest itself as a “ghost”, where the system would say something was present when the signal was coming from outside the space. Depending on the sensors used, there might be some maximum distance the sensors can transmit which might mitigate this issue. Another issue might be when the nearest neighbors might place an object outside the space.  
+
+A regression or random forest approach might solve the first two issues. These models are more portable in that they do not require the training data to make predictions and faster because they don’t need to search the training set for nearest neighbors. To address the outlier issue, we could limit our predictions based on the boundaries of the space. Any predictions outside the space are move to the nearest in-space location. We could potentially deal with outliers in preprocessing, perhaps looking for signal strengths that don’t make sense for the space.
