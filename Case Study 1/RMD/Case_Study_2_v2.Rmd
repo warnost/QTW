@@ -35,11 +35,13 @@ opts_knit$set(width=75)
 
 # Introduction
 
-This case study explores the data captured by real time location systems (RLTS). The data provided indicates the signal strength, as measured in decibels (dB) by a hand-held device, of various fixed access points. Both the scanning devices and the fixed devices are identified in the data by their media access control (MAC) addresses. knn classification is used to classify a location. This is done by combining X and Y coordinates into a single variable for classification. Drawbacks...We also use a multi-target regression....
+This case study explores the data captured by real time location systems (RLTS). The data provided indicates the signal strength, as measured in decibels (dB) by a hand-held device, from various fixed access points. Both the scanning devices and the fixed devices are identified in the data by their media access control (MAC) addresses. k-NN classification is used to classify a location. This is done by combining X and Y coordinates into a single variable for classification. Due to drawbacks that are discussed later, a multi-target regression model is also run.
+
+Section 2 gives some background on the dataset. Section 3 goes into detail about the dataset, data cleanup and the models used. Next, in Section 4 the results for the models are reviewed. Section 5 highlights some drawbacks of using k-NN classification for RLTS and Section 6 concludes this case study.
 
 # Background
 
-Background on dataset from text.
+RTLS are ubiquitous with modern technology. Your phone knows where you are and can give directions to other locations based off of your current location. You can locate someone else's phone, your car, your keys even. Global Positioning Systems (GPS) are a primary location mechanism, but primarily work outdoors. 
 
 # Methods
 
@@ -233,15 +235,28 @@ Cross validation allows us to test our model on data it hasn't seen, to see how 
 ## k-NN classification  
 
 The textbook included mac address 00:0f:a3:39:e1:c0 and excluded 00:0f:a3:39:dd:cd. The reasoning found in the text indicates that these 2 have similar heat maps, indicating they are located close to one another. The first one (00:0f:a3:39:e1:c0) is chosen and 00:0f:a3:39:dd:cd is discarded. Our task was to determine if discarding 00:0f:a3:39:e1:c0 was the correct choice to make.
-The table below shows results from running knn with 5-fold cross validation for different numbers of nearest neighbors. We selected to only run odd values of K to ensure there are no issues with a tie. We also chose to not run a value of one for K. This is to minimize the possibility of overfitting.  
 
-*Table*    
+`Table 3` shows results from running k-NN with 5-fold cross validation for different numbers of nearest neighbors. We selected to only run odd values of K to ensure there are no issues with a tie. We also chose to not run a value of one for k. This is to minimize the possibility of overfitting.  
+
+Table 3: k-NN Classification Accuracies
+
+| MAC Address | k=3 | k=5 | k=7| k=9 | k=11 | Selected K |
+| - | - | - | - | - | - | - |
+| Keep 00:0f:a3:39:e1:c0 | 50.07% | 49.44% | 48.23% | 46.74% | 45.56% | k=3 |
+| Keep 00:0f:a3:39:dd:cd | 49.87% | 49.46% | 48.19% | 46.91% | 45.90% | k=3 |
+| Keep all 7 | 52.96% | 51.93% | 50.55% | 49.15% | 47.87% | k=3 |
 
 Keeping 00:0f:a3:39:e1:c0 turns out to be the better choice, when attempting to decide between 00:0f:a3:39:e1:c0 and 00:0f:a3:39:dd:cd. With K=5 an accuracy of 72.13% is achieved. 6 mac addresses were chosen because of information provided about the dataset. However, using all mac addresses and 3 neighbors achieves a higher accuracy of 75.58%. It would be advisable to discuss this finding with the data provider. If there are truly only 6 mac addresses it would not be appropriate to use all 7.  
 
+## Multi-Target Regression
 
+Table 4: Multi-Target Regression Mean Distance Error
 
-*Table 2*
+| MAC Address | Training | Test |
+| - | - | - | 
+| Keep 00:0f:a3:39:e1:c0 | 8.59 | 10.15 |
+| Keep 00:0f:a3:39:dd:cd | 11.60 | 10.50 |
+| Keep all 7 | 12.73 | 10.52 |
 
 ## Model Code  
 
@@ -258,7 +273,9 @@ fit <- train(posXY ~ .,
              )
 fit
 predict = predict(fit, newdata=online_pivot, type="raw")
-confusionMatrix(predict,as.factor(online_pivot$posXY))
+accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot$posXY)))
+accuracy$correct <- accuracy[,1] == accuracy[,2]
+sum(accuracy$correct)/length(accuracy$correct)
 
 # 6 subMacs, including 00:0f:a3:39:e1:c0
 offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:dd:cd`))
@@ -274,8 +291,10 @@ fit <- train(posXY ~ .,
              preProcess = c("center","scale")
 )
 fit
-predict = predict(fit, newdata=online_pivot_round, type="raw")
-
+predict = predict(fit, newdata=online_pivot, type="raw")
+accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot$posXY)))
+accuracy$correct <- accuracy[,1] == accuracy[,2]
+sum(accuracy$correct)/length(accuracy$correct)
 
 # 6 subMacs, including 00:0f:a3:39:dd:cd
 offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:e1:c0`))
@@ -291,25 +310,22 @@ fit <- train(posXY ~ .,
              preProcess = c("center","scale")
 )
 fit
-#online_pivot_round = select(oline_pivot_6,-c(posXY))
-#online_pivot_round %>% rename(posXY = posXY_round)
-#predict = predict(fit, newdata=online_pivot_round, type="class")
-
+predict = predict(fit, newdata=online_pivot, type="raw")
+accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot$posXY)))
+accuracy$correct <- accuracy[,1] == accuracy[,2]
+sum(accuracy$correct)/length(accuracy$correct)
 
 # multi-target regression
 
-
 # all 7 subMacs
-offline_pivot_x_y1 <- na.omit(offline_pivot_x_y)
-X <- cbind(offline_pivot_x_y1$`00:14:bf:b1:97:8a`,offline_pivot_x_y1$`00:14:bf:b1:97:90`,offline_pivot_x_y1$`00:0f:a3:39:e1:c0`,offline_pivot_x_y1$`00:14:bf:b1:97:8d`,
-           offline_pivot_x_y1$`00:14:bf:b1:97:81`,offline_pivot_x_y1$`00:14:bf:3b:c7:c6`,offline_pivot_x_y1$`00:0f:a3:39:dd:cd`,offline_pivot_x_y1$angle)
-fit <- plsr(cbind(posX,posY) ~ X, ncomp=8, data=offline_pivot_x_y1, scale=TRUE, validation="CV", segments=5)
+X <- cbind(offline_pivot_x_y$`00:14:bf:b1:97:8a`,offline_pivot_x_y$`00:14:bf:b1:97:90`,offline_pivot_x_y$`00:0f:a3:39:e1:c0`,offline_pivot_x_y$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y$`00:14:bf:b1:97:81`,offline_pivot_x_y$`00:14:bf:3b:c7:c6`,offline_pivot_x_y$`00:0f:a3:39:dd:cd`,offline_pivot_x_y$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=8, data=offline_pivot_x_y, scale=TRUE, validation="CV", segments=5)
 mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
 mean_distance_error
 
-online_pivot_x_y1 <- na.omit(online_pivot_x_y)
-newX <- cbind(online_pivot_x_y1$`00:14:bf:b1:97:8a`,online_pivot_x_y1$`00:14:bf:b1:97:90`,online_pivot_x_y1$`00:0f:a3:39:e1:c0`,online_pivot_x_y1$`00:14:bf:b1:97:8d`,
-              online_pivot_x_y1$`00:14:bf:b1:97:81`,online_pivot_x_y1$`00:14:bf:3b:c7:c6`,online_pivot_x_y1$`00:0f:a3:39:dd:cd`,online_pivot_x_y1$angle)
+newX <- cbind(online_pivot_x_y$`00:14:bf:b1:97:8a`,online_pivot_x_y$`00:14:bf:b1:97:90`,online_pivot_x_y$`00:0f:a3:39:e1:c0`,online_pivot_x_y$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y$`00:14:bf:b1:97:81`,online_pivot_x_y$`00:14:bf:3b:c7:c6`,online_pivot_x_y$`00:0f:a3:39:dd:cd`,online_pivot_x_y$angle)
 predict <- predict(fit, ncomp=8, newdata=newX)
 predict_df <- as.data.frame(predict)
 names(predict_df) = c("posX","posY")
@@ -317,16 +333,14 @@ mean_distance_error <- mean(sqrt((online_pivot_x_y1$posX - predict_df$posX)^2+(o
 mean_distance_error
 
 # 6 subMacs, including 00:0f:a3:39:e1:c0
-offline_pivot_x_y1 <- na.omit(offline_pivot_x_y)
-X <- cbind(offline_pivot_x_y1$`00:14:bf:b1:97:8a`,offline_pivot_x_y1$`00:14:bf:b1:97:90`,offline_pivot_x_y1$`00:0f:a3:39:e1:c0`,offline_pivot_x_y1$`00:14:bf:b1:97:8d`,
-           offline_pivot_x_y1$`00:14:bf:b1:97:81`,offline_pivot_x_y1$`00:14:bf:3b:c7:c6`,offline_pivot_x_y1$angle)
-fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y1, scale=TRUE, validation="CV", segments=5)
+X <- cbind(offline_pivot_x_y$`00:14:bf:b1:97:8a`,offline_pivot_x_y$`00:14:bf:b1:97:90`,offline_pivot_x_y$`00:0f:a3:39:e1:c0`,offline_pivot_x_y$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y$`00:14:bf:b1:97:81`,offline_pivot_x_y$`00:14:bf:3b:c7:c6`,offline_pivot_x_y$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y, scale=TRUE, validation="CV", segments=5)
 mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
 mean_distance_error
 
-online_pivot_x_y1 <- na.omit(online_pivot_x_y)
-newX <- cbind(online_pivot_x_y1$`00:14:bf:b1:97:8a`,online_pivot_x_y1$`00:14:bf:b1:97:90`,online_pivot_x_y1$`00:0f:a3:39:e1:c0`,online_pivot_x_y1$`00:14:bf:b1:97:8d`,
-              online_pivot_x_y1$`00:14:bf:b1:97:81`,online_pivot_x_y1$`00:14:bf:3b:c7:c6`,online_pivot_x_y1$angle)
+newX <- cbind(online_pivot_x_y$`00:14:bf:b1:97:8a`,online_pivot_x_y$`00:14:bf:b1:97:90`,online_pivot_x_y$`00:0f:a3:39:e1:c0`,online_pivot_x_y$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y$`00:14:bf:b1:97:81`,online_pivot_x_y$`00:14:bf:3b:c7:c6`,online_pivot_x_y$angle)
 predict <- predict(fit, ncomp=7, newdata=newX)
 predict_df <- as.data.frame(predict)
 names(predict_df) = c("posX","posY")
@@ -335,16 +349,14 @@ mean_distance_error
 
 
 # 6 subMacs, including 00:0f:a3:39:dd:cd
-offline_pivot_x_y1 <- na.omit(offline_pivot_x_y)
-X <- cbind(offline_pivot_x_y1$`00:14:bf:b1:97:8a`,offline_pivot_x_y1$`00:14:bf:b1:97:90`,offline_pivot_x_y1$`00:14:bf:b1:97:8d`,
-           offline_pivot_x_y1$`00:14:bf:b1:97:81`,offline_pivot_x_y1$`00:14:bf:3b:c7:c6`,offline_pivot_x_y1$`00:0f:a3:39:dd:cd`,offline_pivot_x_y1$angle)
-fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y1, scale=TRUE, validation="CV", segments=5)
+X <- cbind(offline_pivot_x_y$`00:14:bf:b1:97:8a`,offline_pivot_x_y$`00:14:bf:b1:97:90`,offline_pivot_x_y$`00:14:bf:b1:97:8d`,
+           offline_pivot_x_y$`00:14:bf:b1:97:81`,offline_pivot_x_y$`00:14:bf:3b:c7:c6`,offline_pivot_x_y$`00:0f:a3:39:dd:cd`,offline_pivot_x_y$angle)
+fit <- plsr(cbind(posX,posY) ~ X, ncomp=7, data=offline_pivot_x_y, scale=TRUE, validation="CV", segments=5)
 mean_distance_error <- mean(sqrt(fit$residuals[1]^2+fit$residuals[2]^2))
 mean_distance_error
 
-online_pivot_x_y1 <- na.omit(online_pivot_x_y)
-newX <- cbind(online_pivot_x_y1$`00:14:bf:b1:97:8a`,online_pivot_x_y1$`00:14:bf:b1:97:90`,online_pivot_x_y1$`00:14:bf:b1:97:8d`,
-              online_pivot_x_y1$`00:14:bf:b1:97:81`,online_pivot_x_y1$`00:14:bf:3b:c7:c6`,online_pivot_x_y1$`00:0f:a3:39:dd:cd`,online_pivot_x_y1$angle)
+newX <- cbind(online_pivot_x_y$`00:14:bf:b1:97:8a`,online_pivot_x_y$`00:14:bf:b1:97:90`,online_pivot_x_y$`00:14:bf:b1:97:8d`,
+              online_pivot_x_y$`00:14:bf:b1:97:81`,online_pivot_x_y$`00:14:bf:3b:c7:c6`,online_pivot_x_y$`00:0f:a3:39:dd:cd`,online_pivot_x_y$angle)
 predict <- predict(fit, ncomp=7, newdata=newX)
 predict_df <- as.data.frame(predict)
 names(predict_df) = c("posX","posY")
@@ -362,3 +374,5 @@ Large training set sizes could also be an issue when it comes time to compute th
 Finally, there could be issues with outliers or irregular spaces. A new data point far outside the space would be placed by the average of its three closest neighbors, which could be far away from its actual location. I think that would manifest itself as a “ghost”, where the system would say something was present when the signal was coming from outside the space. Depending on the sensors used, there might be some maximum distance the sensors can transmit which might mitigate this issue. Another issue might be when the nearest neighbors might place an object outside the space.  
 
 A regression or random forest approach might solve the first two issues. These models are more portable in that they do not require the training data to make predictions and faster because they don’t need to search the training set for nearest neighbors. To address the outlier issue, we could limit our predictions based on the boundaries of the space. Any predictions outside the space are move to the nearest in-space location. We could potentially deal with outliers in preprocessing, perhaps looking for signal strengths that don’t make sense for the space.
+
+# Conclusion
