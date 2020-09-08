@@ -169,6 +169,10 @@ accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(onli
 accuracy$correct <- accuracy[,1] == accuracy[,2]
 acc = sum(accuracy$correct)/length(accuracy$correct)
 
+predict_split = str_split(predict, "-", simplify=TRUE)
+actual_split = str_split(online_pivot$posXY, "-", simplify=TRUE)
+mean_distance_error = mean(sqrt((as.numeric(predict_split[,1]) - as.numeric(actual_split[,1]))^2+(as.numeric(predict_split[,2]) - as.numeric(actual_split[,2]))^2))
+
 # 6 subMacs, including 00:0f:a3:39:dd:cd
 offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:e1:c0`))
 online_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:e1:c0`))
@@ -186,6 +190,10 @@ accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(onli
 accuracy$correct <- accuracy[,1] == accuracy[,2]
 acc = sum(accuracy$correct)/length(accuracy$correct)
 
+predict_split = str_split(predict, "-", simplify=TRUE)
+actual_split = str_split(online_pivot_6$posXY, "-", simplify=TRUE)
+mean_distance_error = mean(sqrt((as.numeric(predict_split[,1]) - as.numeric(actual_split[,1]))^2+(as.numeric(predict_split[,2]) - as.numeric(actual_split[,2]))^2))
+
 # 6 subMacs, including 00:0f:a3:39:e1:c0
 offline_pivot_6 = select(offline_pivot,-c(`00:0f:a3:39:dd:cd`))
 online_pivot_6 = select(online_pivot,-c(`00:0f:a3:39:dd:cd`))
@@ -202,6 +210,10 @@ predict = predict(fit, newdata=online_pivot_6, type="raw")
 accuracy <- as.data.frame(cbind(predict=as.factor(predict),actual=as.factor(online_pivot_6$posXY)))
 accuracy$correct <- accuracy[,1] == accuracy[,2]
 acc = sum(accuracy$correct)/length(accuracy$correct)
+
+predict_split = str_split(predict, "-", simplify=TRUE)
+actual_split = str_split(online_pivot_6$posXY, "-", simplify=TRUE)
+mean_distance_error = mean(sqrt((as.numeric(predict_split[,1]) - as.numeric(actual_split[,1]))^2+(as.numeric(predict_split[,2]) - as.numeric(actual_split[,2]))^2))
 
 
 # multi-target regression
@@ -248,7 +260,9 @@ mean_distance_error <- mean(sqrt((online_pivot_x_y$posX - predict_df$posX)^2+(on
 
 # Introduction
 
-This case study explores the data captured by real time location systems (RLTS). The data provided indicates the signal strength, as measured in decibels (dB) by a hand-held device, from various fixed access points. Both the scanning devices and the fixed devices are identified in the data by their media access control (MAC) addresses. k-NN classification is used to classify a location. This is done by combining X and Y coordinates into a single variable for classification. Due to drawbacks that are discussed later, a multi-target regression model is also run.
+This case study explores the data captured by real time location systems (RLTS). The data provided indicates the signal strength, as measured in decibels (dB) by a hand-held device, from various fixed access points. Both the scanning devices and the fixed devices are identified in the data by their media access control (MAC) addresses. 
+
+The objective of this case study is to locate the position of a scanning device based on signal strenths from fixed devices. k-NN classification is one method that will be presented and it will be used to classify a location. This is done by combining X and Y coordinates into a single variable for classification. Due to drawbacks that are discussed in Section 6, a multi-target regression model is also run.
 
 Section 3 gives some background on the dataset. Section 4 goes into detail about the dataset, data cleanup and the models used. Next, in Section 5 the results for the models are reviewed. Section 6 highlights some drawbacks of using k-NN classification for RLTS and Section 7 concludes this case study.
 
@@ -260,7 +274,7 @@ RTLS are ubiquitous with modern technology. Your phone knows where you are and c
 
 ## Dataset
 
-The dataset used in this case study contains 914,951 signal strength readings from one floor of a building at the University of Mannheim. There are 6 fixed access points where the signal strength is measured from hand-held devices. 166 different spots were selected for the hand-held devices to record signal strength. At each of these 166 spots measurements were taken at different angles. There were 9 possible angles, each spaced 45 degrees apart.
+The dataset used in this case study contains 914,951 signal strength readings from one floor of a building at the University of Mannheim. There are 6 fixed access points where the signal strength is measured from hand-held devices. 166 different spots were selected for the hand-held devices to record signal strengths. At each of these 166 spots, measurements were taken at different angles. There were 9 possible angles, each spaced 45 degrees apart.
 
 The data is organized as a text file with each line representing a measurement event. An example line and each variable recorded are shown below.
 
@@ -295,7 +309,7 @@ Next, a function is applied to parse the data from a sting into columns. The las
 
 There are some records in the dataset that are from adhoc access points. Due to information provided in the textbook, these records have been removed because they are not of interest.
 
-As noted in `Table 1` there are several variables that have the same value throughout the dataset: `id`, `posZ` and `channel frequency`. Also, since adhoc access points were filtered out of the dataset, `access point type` also has the same value throughout the dataset. These variables are dropped.
+As noted in `Table 1` there are several variables that have the same value throughout the dataset: `id`, `posZ` and `channel frequency`. Since adhoc access points were filtered out of the dataset, `access point type` also has the same value throughout the dataset. These variables are dropped.
 
 The textbook noted that there are only 6 actual access points, however more are found in the dataset. Only the top 7 addresses by frequency will be considered in this analysis. `Table 2` displays the MAC address access point and frequency for the top 7 access points. The dataset is filtered to only include these 7 MAC addresses.
 
@@ -313,13 +327,13 @@ Table 2: MAC Address Access Point Frequency
 
 Data types also need to be corrected. `time`, `posX`, `posY`, `orientation`, and `signal` are converted to numeric. `time` is further converted to datetime. `degree` is also adjusted by rounding to the nearest 45 degree increment.
 
-Each measurement event can be uniquely identified by the time, position, and orientation of the scanning device. However, our initial processing of the text file created a "long" dataframe that had multiple rows for each unique event. Each row represents a measurement for one of the 7 fixed access devices. The dataframe is transposed from "long" to "wide" to make each row a unique event. The resulting dataframe has 7 new variables, each representing a fixed access device's measurement.
+Each measurement event can be uniquely identified by the time, position, and orientation of the scanning device. However, our initial processing of the text file created a "long" dataframe that had multiple rows for each unique event. Each row represents a measurement for one of the 7 fixed access devices. The dataframe is transposed from "long" to "wide" to make each row a unique event. The resulting dataframe has 7 new variables, each representing a fixed access device's signal strength measurement.
 
-A review of the resulting dataframes show that there are missing values for some measurements. The models described in the next section require the data to not have missing values. The option chosen here to handle missing values is drop records where any of the explanatory variables are missing. Another possible option would have been to impute missing values.
+A review of the resulting dataframe shows that there are missing values for some measurements. The models described in the next section require the data to not have missing values. The option chosen here to handle missing values is drop records where any of the explanatory variables are missing. Another possible option would have been to impute missing values.
 
 The k-NN classification model will also require a singular categorical target variable. `posX` and `posY` are concatenated together into `posXY`, where the X and Y values are separated by a hyphen. At this point, a copy of the dataframe is made. One copy (offline_pivot) will be used for k-NN classification and the other copy (offline_pivot_x_y) will be used for multi-target regression. The reason for creating 2 datasets is that the same set of variables is not needed for each model. `posXY` is needed for k-NN classification, but `posX` and `posY` are needed for multi-target regression. Other variables that do not provide any extra value for modeling are dropped: `time`, `rawTime` and `orientation` (using the rounded `angle` instead).
 
-The steps outlined above are used both on the offline textfile (training) and the online textfile (test). There is an extra step taken for the online dataset. For k-NN classification, the same target variables need to be in the training and test datasets. The online dataset has coordinates with decimal places and the offline dataset were integers. Therefore, `posX` and `posY` were rounded to the nearest integer. These rounded positions will be used for k-NN classification. The exact positions will be used for multi-target regression.
+The steps outlined above are used both on the offline textfile (training) and the online textfile (test). There is an extra step taken for the online dataset. For k-NN classification, the same target variables need to be in the training and test datasets. The online dataset has coordinates with decimal places and the offline dataset has integers. Therefore, `posX` and `posY` were rounded to the nearest integer. These rounded positions will be used for k-NN classification. The exact positions will be used for multi-target regression.
 
 ## Modeling  
 
@@ -333,9 +347,9 @@ k-NN classification is used to predict the categorical variable `posXY`, which c
 
 A drawback for using a classification modeling technique for this dataset is that combinations of X and Y that are found in the test dataset, but not the training dataset, do not have the chance of being classified correctly. A classification model can only classify observations based on the classes available in the training dataset. The training dataset provided had all X and Y values rounded to the nearest integer. The test dataset had many unrounded values. This issue and the fact that there are 2 target variables (X and Y), lead us to research multi-target regression models.  
 
-The pls package in R provides a multi-target Partial Least Squares Regression model.  Partial Least Squares decomposes a matrix of independent variables X and a matrix of target variables Y. While the number of optimal components could have been evaluated, for the problem here the model is forced to include all components (or variables). The ability to use a matrix Y is what is focused on.
+The pls package in R provides a multi-target Partial Least Squares Regression model.  Partial Least Squares decomposes a matrix of independent variables X and a matrix of target variables Y. While the number of optimal components could have been evaluated, for the problem here, the model is forced to include all components (or variables). The ability to use a matrix Y is what is focused on.
 
-More drawbacks to k-NN classification are discussed in Section 5.
+More drawbacks to k-NN classification are discussed in Section 6
 
 ### K-Fold Cross Validation  
 
@@ -345,27 +359,29 @@ Cross validation allows us to test our model on data it hasn't seen, to see how 
 
 ## k-NN Classification  
 
-Accuracy is used as the evaluation metric for this classification problem. 
+Accuracy is used as the evaluation metric for this classification problem. However, in order to compare the k-NN classification model with the multi-target regression model, a distance metric is also calculated. The distance calculation attempts to recreate a Euclidean distance. The formula is:
+
+$$\frac{\sum_{i=1}^N\sqrt{Residuals_X^2 + Residuals_Y^2}}{N}$$
+
+Due to data that comes out of the k-NN classification model, this metric is only calculated on the predictions for the online (test) dataset.
 
 The textbook included mac address 00:0f:a3:39:e1:c0 and excluded 00:0f:a3:39:dd:cd. The reasoning found in the text indicates that these 2 have similar heat maps, indicating they are located close to one another. The first one (00:0f:a3:39:e1:c0) is chosen and 00:0f:a3:39:dd:cd is discarded. Our task was to determine if discarding 00:0f:a3:39:e1:c0 was the correct choice to make.
 
-`Table 3` shows results from running k-NN with 5-fold cross validation for different numbers of nearest neighbors. Only odd values of K were run to ensure there are no issues with a tie. Also a value of one for k was not runm is to minimize the possibility of overfitting.  
+`Table 3` shows results from running k-NN with 5-fold cross validation for different numbers of nearest neighbors. Only odd values of K were run to ensure there are no issues with a tie. Also a value of one for k was not run is to minimize the possibility of overfitting.  
 
 Table 3: k-NN Classification Accuracies
 
-| MAC Address | k=3 | k=5 | k=7| k=9 | k=11 | Selected K | Test Dataset Accuracy |
-| - | - | - | - | - | - | - |
-| Keep 00:0f:a3:39:e1:c0 | 71.99% | 71.81% | 71.02% | 70.03% | 69.08% | k=3 | 0.30% |
-| Keep 00:0f:a3:39:dd:cd | 71.39% | 71.67% | 71.05% | 70.10% | 69.38% | k=5 | 0.69% |
-| Keep all 7 | 75.58% | 75.57% | 74.69% | 73.78% | 72.80% | k=3 | 0.43% |
+| MAC Address | k=3 | k=5 | k=7| k=9 | k=11 | Selected K | Test Accuracy | Test Distance Measurement |
+| - | - | - | - | - | - | - | |
+| Keep 00:0f:a3:39:e1:c0 | 71.99% | 71.81% | 71.02% | 70.03% | 69.08% | k=3 | 0.30% | 3.13 |
+| Keep 00:0f:a3:39:dd:cd | 71.39% | 71.67% | 71.05% | 70.10% | 69.38% | k=5 | 0.69% | 2.90 |
+| Keep all 7 | 75.58% | 75.57% | 74.69% | 73.78% | 72.80% | k=3 | 0.43% | 2.96 |
 
-Keeping 00:0f:a3:39:e1:c0 turns out to be the better choice, when attempting to decide between 00:0f:a3:39:e1:c0 and 00:0f:a3:39:dd:cd. With k=3 an accuracy of 71.99% is achieved. 6 MAC addresses were chosen because of information provided about the dataset. However, using all MAC addresses and 3 neighbors achieves a higher accuracy of 75.58%. It would be advisable to discuss this finding with the data provider. If there are truly only 6 MAC addresses it would not be appropriate to use all 7. The models with the selected k values were used to predict the online (or test) dataset. Accuracies were extremely low. This is at least partially due to the decimal issue that was encountered with the online dataset where the X and Y coordinates had decimals (the offline dataset did not have decimals). 
+Keeping 00:0f:a3:39:e1:c0 turns out to be the better choice (when looking at accuracy of the training dataset), when attempting to decide between 00:0f:a3:39:e1:c0 and 00:0f:a3:39:dd:cd. With k=3 an accuracy of 71.99% is achieved. 6 MAC addresses were chosen because of information provided about the dataset. However, using all MAC addresses and 3 neighbors achieves a higher accuracy of 75.58%. It would be advisable to discuss this finding with the data provider. If there are truly only 6 MAC addresses it would not be appropriate to use all 7. The models with the selected k values were used to predict the online (or test) dataset. Accuracies were extremely low. This is at least partially due to the decimal issue that was encountered with the online dataset where the X and Y coordinates had decimals (the offline dataset did not have decimals). 
 
 ## Multi-Target Regression
 
-Accuracy as an evaluation metric isn't available for multi-target regression. A distance calculation is used instead. The distance calculation used for the multi-target regression model attempts to recreate a Euclidean distance. The formula is:
-
-$$\frac{\sum_{i=1}^N\sqrt{Residuals_X^2 + Residuals_Y^2}}{N}$$
+Accuracy as an evaluation metric isn't available for multi-target regression. The same distance calculation decribed above is used here. For multi-target regression however, this calculation is available for both the offline (training) and online (test) datasets.  
 
 `Table 4` shows results from running multi-target regression with 5-fold cross validation. 
 
@@ -377,7 +393,11 @@ Table 4: Multi-Target Regression Mean Distance Error
 | Keep 00:0f:a3:39:dd:cd | 1.86 | 3.22 |
 | Keep all 7 | 2.61 | 3.20 |
 
-The multi-target regression model with the lowest error was the model using 6 MAC addresses where 00:0f:a3:39:e1:c0 was included. The different evaluation metrics used for k-NN classification and multi-target regression make it impossible to evaluate a winning model between these 2 types of models. This same distance metric could be calculated for k-NN by separating out the predicted X and Y coordinates. This would allow for direct comparison.
+The multi-target regression model with the lowest error was the model using 6 MAC addresses where 00:0f:a3:39:e1:c0 was included. The multi-target regression model indicates using 6 MAC addresses with 00:0f:a3:39:e1:c0 is the winning model and the k-NN classification indicates that keeping all 7 MAC addresses is the winning model.
+
+When looking at distance metrics for the online (test) dataset, the winning model is k-NN using 6 MAC addresses with 00:0f:a3:39:dd:cd. However this statement is somewhat problematic, since this information is only available on the online (test) dataset for k-NN classification.
+
+`Figure 1` plots error bars for the multi-target regression model using 6 MAC addresses where 00:0f:a3:39:e1:c0 was included. The bars connect the actual location in pink with the predicted location in teal. There are larger errors found at the ends of the Y axis, due to the fact that less data is available in those extremes.
 
 ```{r plots}
 ## This is a function to plot the actual vs predicted pairs, joining them with a line to easily see errors
@@ -420,21 +440,21 @@ p + labs(title="Figure 1: Error Plot for Multi-Target Regression using 00:0f:a3:
          xlab("X Position") +
          ylab("Y Position") +
   theme(plot.caption = element_text(hjust = 0, face= "italic"),
- #       plot.title.position = "plot",
-        legend.title = element_blank()) +
+         legend.title = element_blank()) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
 ```
 
 # Drawbacks and Alternatives  
 
-KNN has several drawbacks for predicting real time location. The model is not easily transferable without the training data, its speed decreases with more observations, and it could have difficulty with outliers.  
+k-NN has several drawbacks for predicting real time location. The model is not easily transferable without the training data, its speed decreases with more observations, and it could have difficulty with outliers.  
 
-KNN predictions are made by comparing a point to its closest neighbors then determining its location by either voting or an average of its neighbors’ locations. This means you must have other data points to make a prediction. If the training set is large, it would need to be copied to every location where the model would need to be run. If it is running on a single server somewhere that might not be an issue, but if it is running on user’s cell phones that might make the transfer time consuming and the storage cost to the user might be prohibitive. 
-Large training set sizes could also be an issue when it comes time to compute the prediction. The more observations in the training set, the more need to be searched through to find the nearest neighbors, increasing prediction time. The cost of this would be dependent on the use case. If it is merely observational, perhaps a few seconds difference might not matter. But it a decision needs to be made quickly based on location, then it could be a significant problem. For instance, if a robotic currier needed to decide where to turn based on its location, or trying to intercept an item moving through a storage facility.  
+k-NN predictions are made by comparing a point to its closest neighbors then determining its location by either voting or calculating an average of its neighbors’ locations. This means you must have other data points to make a prediction. If the training set is large, it would need to be copied to every location where the model would need to be run. If it is running on a single server somewhere that might not be an issue. However, if it is running on user’s cell phones that might make the transfer time consuming and the storage cost to the user might be prohibitive. 
 
-Finally, there could be issues with outliers or irregular spaces. A new data point far outside the space would be placed by the average of its three closest neighbors, which could be far away from its actual location. I think that would manifest itself as a “ghost”, where the system would say something was present when the signal was coming from outside the space. Depending on the sensors used, there might be some maximum distance the sensors can transmit which might mitigate this issue. Another issue might be when the nearest neighbors might place an object outside the space.  
+Large training set sizes could also be an issue when it comes time to compute the prediction. The more observations in the training set, the more need to be searched through to find the nearest neighbors, increasing prediction time. The cost of this would be dependent on the use case. If it is merely observational, perhaps a few seconds difference might not matter. If, however, a decision needs to be made quickly based on location, then it could be a significant problem. For instance, a robotic currier needs to decide where to turn based on its location, or trying to intercept an item moving through a storage facility.  
 
-A regression or random forest approach might solve the first two issues. These models are more portable in that they do not require the training data to make predictions and faster because they don’t need to search the training set for nearest neighbors. To address the outlier issue, we could limit our predictions based on the boundaries of the space. Any predictions outside the space are move to the nearest in-space location. We could potentially deal with outliers in preprocessing, perhaps looking for signal strengths that don’t make sense for the space.
+Finally, there could be issues with outliers or irregular spaces. A new data point far outside the space would be placed by the average of its three closest neighbors, which could be far away from its actual location. This could manifest itself as a “ghost”, where the system would say something was present when the signal was coming from outside the space. Depending on the sensors used, there might be some maximum distance the sensors can transmit which might mitigate this issue. Another issue might be when the nearest neighbors might place an object outside the space.  
+
+A regression or random forest approach might solve the first two issues. These models are more portable in that they do not require the training data to make predictions and faster because they don’t need to search the training set for nearest neighbors. To address the outlier issue, we could limit our predictions based on the boundaries of the space. Any predictions outside the space are moved to the nearest in-space location. Outliers could potentially be dealt with in preprocessing, perhaps looking for signal strengths that don’t make sense for the space.
 
 # Conclusion
