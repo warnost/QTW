@@ -15,7 +15,7 @@ output:
 library(knitr)
 library(rmdformats)
 library(formatR)
-
+library(naniar)
 library(tidyverse)
 library(magrittr)
 library(caret)
@@ -37,7 +37,7 @@ opts_knit$set(width=75)
 
 Use the `code` button to the right to expand the code for cleaning up the dataset.
 
-```{r datapull1}
+```{r datapull1, include=FALSE}
 ########## Data Cleanup ##########
 
 processLine = function(x){
@@ -119,6 +119,7 @@ online$signal %<>% as.integer
 offline_pivot<-offline %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
 online_pivot<- online %>% pivot_wider(names_from = mac,values_from = signal, values_fn = list(signal=mean))
 
+miss_plot <- vis_miss(offline_pivot,warn_large_data = F)
 # impute NA 
 #offline_pivot[is.na(offline_pivot)] <- -100
 #online_pivot[is.na(online_pivot)] <- -100
@@ -331,6 +332,20 @@ Each measurement event can be uniquely identified by the time, position, and ori
 
 A review of the resulting dataframe shows that there are missing values for some measurements. The models described in the next section require the data to not have missing values. The option chosen here to handle missing values is drop records where any of the explanatory variables are missing. Another possible option would have been to impute missing values.
 
+```{r missing chart}
+caption <- "Figure 1: This plot shows where missing data is located in the data. We can see that some observations are missing signal strength for some access points"
+caption <- paste0(strwrap(caption, 80), sep="", collapse="\n")
+
+miss_plot + labs(title="Figure 1: Missing Signal Strength Data", 
+         caption= caption) +
+    theme(plot.caption = element_text(hjust = 0, face= "italic"),
+        legend.title = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+```
+
+
 The k-NN classification model will also require a singular categorical target variable. `posX` and `posY` are concatenated together into `posXY`, where the X and Y values are separated by a hyphen. At this point, a copy of the dataframe is made. One copy (offline_pivot) will be used for k-NN classification and the other copy (offline_pivot_x_y) will be used for multi-target regression. The reason for creating 2 datasets is that the same set of variables is not needed for each model. `posXY` is needed for k-NN classification, but `posX` and `posY` are needed for multi-target regression. Other variables that do not provide any extra value for modeling are dropped: `time`, `rawTime` and `orientation` (using the rounded `angle` instead).
 
 The steps outlined above are used both on the offline textfile (training) and the online textfile (test). There is an extra step taken for the online dataset. For k-NN classification, the same target variables need to be in the training and test datasets. The online dataset has coordinates with decimal places and the offline dataset has integers. Therefore, `posX` and `posY` were rounded to the nearest integer. These rounded positions will be used for k-NN classification. The exact positions will be used for multi-target regression.
@@ -429,12 +444,11 @@ plot_distances <- function(actual_orig, predicted_orig, sample = 100, seed = 314
 
 p <- plot_distances(online_pivot_x_y[,c("posX","posY")],predict_df[,c("posX","posY")])
 
-caption <- "Figure 1: This plot shows the differences between actual and predicted 
-values for the multi-target regression model using 00:0f:a3:39:e1:c0. The model mostly predicts in the middle region,  
-and the larger errors are associated with observations with high or low Y values."
+caption <- "Figure 2: This plot shows the differences between actual and predicted 
+values for the multi-target regression model using 00:0f:a3:39:e1:c0."
 caption <- paste0(strwrap(caption, 80), sep="", collapse="\n")
 
-p + labs(title="Figure 1: Error Plot for Multi-Target Regression using 00:0f:a3:39:e1:c0", 
+p + labs(title="Figure 2: Error Plot for Multi-Target Regression using 00:0f:a3:39:e1:c0", 
          caption= caption,
          colow = "Group") +
          xlab("X Position") +
@@ -464,7 +478,7 @@ We built six models using k-NN and multi-target regression methods, with a close
 
 The k-NN model performed best in training with 3 neighbors and keeping all 7 mac addresses. We achieved 75.58% training accuracy, although all models had training accuracy of 69% or higher. This is our best estimate of error on an unknown data set. Test accuracy was much lower, but we will see the distance metric compares favorably to that of the multi-target regression. The model that keeps "00:0f:a3:39:dd:cd" is the best in test data, using distance as the metric. The k-NN method has drawbacks including being difficult to transport, modeling continuous variables as categorical, long run times and difficulty with outliers.
 
-The multi-target regression represents the target variables as continuous, which seems more natural for this coordinate system. We used an average Euclidean distance metric to assess performance, and we found that keeping just the mac address "00:0f:a3:39:e1:c0" performed the best in training, rather than keeping both it and its co-located partner. In the test set, keeping all 7 addresses worked the best. The multi-target method has its own issues. First, most of the predictions fall along the center of the space, so it did not capture the non-linearity in the data well. Second, predictions can occur outside the space, so in practice we would need rules to confine predictions to the floor plan.  
+The multi-target regression represents the target variables as continuous, which seems more natural for this coordinate system. We used an average Euclidean distance metric to assess performance, and we found that keeping just the mac address "00:0f:a3:39:e1:c0" performed the best in training, rather than keeping both it and its co-located partner. In the test set, keeping all 7 addresses worked the best. The multi-target method has its own issues. Predictions can occur outside the space, so in practice we would need rules to confine predictions to the floor plan.  
 
 We would recommend additional feature creation and testing other algorithms to see if we can better capture the non-linearity of the data and improve our predictions. When measuring model performance, accuracy is not a good metric for a continuous variable, it declines significantly even if predictions are close. Distance provides a much better trade off. 
 
