@@ -332,6 +332,8 @@ Each measurement event can be uniquely identified by the time, position, and ori
 
 A review of the resulting dataframe shows that there are missing values for some measurements. The models described in the next section require the data to not have missing values. The option chosen here to handle missing values is drop records where any of the explanatory variables are missing. Another possible option would have been to impute missing values.
 
+`Figure 1` is a visual representation of the missing data and where it occurs.
+
 ```{r missing chart}
 caption <- "Figure 1: This plot shows where missing data is located in the data. We can see that some observations are missing signal strength for some access points"
 caption <- paste0(strwrap(caption, 80), sep="", collapse="\n")
@@ -380,7 +382,7 @@ $$\frac{\sum_{i=1}^N\sqrt{(X_{i,actual} - X_{i,predicted})^2 + (Y_{i,actual} - Y
 
 Due to data that comes out of the k-NN classification model, this metric is only calculated on the predictions for the online (test) dataset.
 
-The textbook included mac address 00:0f:a3:39:e1:c0 and excluded 00:0f:a3:39:dd:cd. The reasoning found in the text indicates that these 2 have similar heat maps, indicating they are located close to one another. The first one (00:0f:a3:39:e1:c0) is chosen and 00:0f:a3:39:dd:cd is discarded. Our task was to determine if discarding 00:0f:a3:39:e1:c0 was the correct choice to make.
+The textbook included MAC address 00:0f:a3:39:e1:c0 and excluded 00:0f:a3:39:dd:cd. The reasoning found in the text indicates that these 2 have similar heat maps, indicating they are located close to one another. The first one (00:0f:a3:39:e1:c0) is chosen and 00:0f:a3:39:dd:cd is discarded. Our task was to determine if discarding 00:0f:a3:39:e1:c0 was the correct choice to make.
 
 `Table 3` shows results from running k-NN with 5-fold cross validation for different numbers of nearest neighbors. Only odd values of K were run to ensure there are no issues with a tie. Also a value of one for k was not run is to minimize the possibility of overfitting.  
 
@@ -412,7 +414,7 @@ The multi-target regression model with the lowest error was the model using 6 MA
 
 When looking at distance metrics for the online (test) dataset, the winning model is k-NN using 6 MAC addresses with 00:0f:a3:39:dd:cd. However this statement is somewhat problematic, since this information is only available on the online (test) dataset for k-NN classification.
 
-`Figure 1` plots error bars for the multi-target regression model using 6 MAC addresses where 00:0f:a3:39:e1:c0 was included. The bars connect the actual location in pink with the predicted location in teal. There are larger errors found at the ends of the Y axis, due to the fact that less data is available in those extremes.
+`Figure 2` plots error bars for the multi-target regression model using 6 MAC addresses where 00:0f:a3:39:e1:c0 was included. The bars connect the actual location in pink with the predicted location in teal. 
 
 ```{r plots}
 ## This is a function to plot the actual vs predicted pairs, joining them with a line to easily see errors
@@ -474,17 +476,17 @@ A regression or random forest approach might solve the first two issues. It woul
 
 # Conclusion
 
-We built six models using k-NN and multi-target regression methods, with a closer look at two mac addresses that appear to be in the same location. Each method tested three models, two that used each co-located mac address separately with the other 5 mac addresses, and one with all 7 mac addresses. The multi-target regression looks to address some of the issues with the k-NN method.  
+We built six models using k-NN and multi-target regression methods, with a closer look at two MAC addresses that appear to be in the same location. Each method tested three models, two that used each co-located MAC address separately with the other 5 MAC addresses, and one with all 7 MAC addresses. The multi-target regression looks to address some of the issues with the k-NN method.  
 
-The k-NN model performed best in training with 3 neighbors and keeping all 7 mac addresses. We achieved 75.58% training accuracy, although all models had training accuracy of 69% or higher. This is our best estimate of error on an unknown data set. Test accuracy was much lower, but we will see the distance metric compares favorably to that of the multi-target regression. The model that keeps "00:0f:a3:39:dd:cd" is the best in test data, using distance as the metric. The k-NN method has drawbacks including being difficult to transport, modeling continuous variables as categorical, long run times and difficulty with outliers.
+The k-NN model performed best in training with 3 neighbors and keeping all 7 MAC addresses. We achieved 75.58% training accuracy, although all models had training accuracy of 69% or higher. This is our best estimate of error on an unknown data set. Test accuracy was much lower, but we will see the distance metric compares favorably to that of the multi-target regression. The model that keeps "00:0f:a3:39:dd:cd" is the best in test data, using distance as the metric. The k-NN method has drawbacks including being difficult to transport, modeling continuous variables as categorical, long run times and difficulty with outliers.
 
-The multi-target regression represents the target variables as continuous, which seems more natural for this coordinate system. We used an average Euclidean distance metric to assess performance, and we found that keeping just the mac address "00:0f:a3:39:e1:c0" performed the best in training, rather than keeping both it and its co-located partner. In the test set, keeping all 7 addresses worked the best. The multi-target method has its own issues. Predictions can occur outside the space, so in practice we would need rules to confine predictions to the floor plan.  
+The multi-target regression represents the target variables as continuous, which seems more natural for this coordinate system. We used an average Euclidean distance metric to assess performance, and we found that keeping just the MAC address "00:0f:a3:39:e1:c0" performed the best in training, rather than keeping both it and its co-located partner. In the test set, keeping all 7 addresses worked the best. The multi-target method has its own issues. Predictions can occur outside the space, so in practice we would need rules to confine predictions to the floor plan.  
 
 We would recommend additional feature creation and testing other algorithms to see if we can better capture the non-linearity of the data and improve our predictions. When measuring model performance, accuracy is not a good metric for a continuous variable, it declines significantly even if predictions are close. Distance provides a much better trade off. 
 
 # References 
 
-(http://rdatasciencecases.org/) Case Studies in Data Science with R by Nolan and Lang
+(http://rdatasciencecases.org/) Case Studies in Data Science with R by Nolan and Lang.
 
-(https://www.jstatsoft.org/article/view/v018i02) The pls Package: Principal Component and Partial Least Squares Regression in R, Mevik, Journal of Statistical Software
+(https://www.jstatsoft.org/article/view/v018i02) The pls Package: Principal Component and Partial Least Squares Regression in R, Mevik, Journal of Statistical Software.
 
