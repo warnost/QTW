@@ -6,7 +6,7 @@ output: html_notebook
 This Notebook imports data for the cherry blossom case study
 
 ```{r}
-setwd("C:/Users/William/OneDrive/MSDS_7331_QTW/cherry")
+setwd("C:/Users/William/OneDrive/MSDS_7331_QTW/QTW/Will/cherry")
 library(XML)
 ubase = "http://www.cherryblossom.org/"
 menURLs = 
@@ -35,7 +35,7 @@ extractResTable =
   function(url = "http://www.cherryblossom.org/results/2009/09cucb-F.htm",
            year = 1999, sex = "male", file = NULL)
   {
-    doc = htmlParse(url)
+    doc = htmlParse(url, encoding = "utf-8")
     
     if (year == 2000) {
       # Get preformatted text from 4th font element
@@ -86,7 +86,7 @@ save(menTables, file = "CBMenTextTables.rda")
 ```
 
 ```{r}
-extractResTable(url = urls[11], year = 2009, sex = 'male')
+#extractResTable(url = urls[11], year = 2009, sex = 'male')
 ```
 
 ```{r}
