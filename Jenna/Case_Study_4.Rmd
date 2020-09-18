@@ -39,9 +39,14 @@ Use the `code` button to the right to expand the code for cleaning up the datase
 
 ```{r datapull1, include=FALSE}
 
-#setwd("C:/Users/b007224/Documents/masters_in_data_science/quantifying_the_world/QTW/Case Study 2/Data")
+## Load the mens tables
+setwd("C:/Users/b007224/Documents/masters_in_data_science/quantifying_the_world/QTW/Will/cherry")
+load(file = "C:/Users/b007224/Documents/masters_in_data_science/quantifying_the_world/QTW/Will/cherry/CBMenTextTables.rda")
+print("List menTables read in")
 
-els = readLines("C:/Users/b007224/Documents/masters_in_data_science/quantifying_the_world/QTW/Case Study 2/Data/men_2012.txt")
+## Load the womens tables
+load(file = "C:/Users/b007224/Documents/masters_in_data_science/quantifying_the_world/QTW/Will/cherry/CBWomenTextTables.rda")
+print("List womenTables read in")
 
 # search for spaces in the row of equals to identify columns
 findColLocs = function(spacerRow) {
@@ -58,20 +63,13 @@ findColLocs = function(spacerRow) {
 
 # function to split the data into columns, based on spaces from the row of =
 # also only includes the columns we specify
-selectCols = 
-function(colNames, headerRow, searchLocs) 
-{
-  sapply(colNames, 
-         function(name, headerRow, searchLocs)
-         {
-           startPos = regexpr(name, headerRow)[[1]]
-           if (startPos == -1) 
-             return( c(NA, NA) )
-    
-           index = sum(startPos >= searchLocs)
-           c(searchLocs[index] + 1, searchLocs[index + 1] - 1)
-         },
-         headerRow = headerRow, searchLocs = searchLocs )
+selectCols = function(shortColNames, headerRow, searchLocs) {
+  sapply(shortColNames, function(shortName, headerRow, searchLocs){
+    startPos = regexpr(shortName, headerRow)[[1]]
+    if (startPos == -1) return( c(NA, NA) )
+    index = sum(startPos >= searchLocs)
+    c(searchLocs[index] + 1, searchLocs[index + 1])
+  }, headerRow = headerRow, searchLocs = searchLocs )
 }
 
  ######## still need to drop that last line with blanks all the way across ########
@@ -104,15 +102,8 @@ extractVariables =
       invisible(Values)
     }
 
-##### 2009 is in XML format?
-mfilenames = paste("C:/Users/b007224/Documents/masters_in_data_science/quantifying_the_world/QTW/Case Study 2/Data/men_", 1999:2008, ".txt", sep = "")
-menFiles = lapply(mfilenames, readLines)
-names(menFiles) = 1999:2008
-
-menResMat = lapply(menFiles, extractVariables)
-length(menResMat)
-
-sapply(menResMat, nrow)
+# apply extractVariables function to dataset
+menResMat = lapply(menTables, extractVariables)
 
 ### The 2001 results for women are missing the === and the column names.
 ### Can we pick it up from the 2001 men? YES! Make an exercise
@@ -126,39 +117,9 @@ sapply(menResMat, nrow)
 #head(womenResMat[[3]], 10)
 #tail(womenResMat[[3]], 10)
 
-age = as.numeric(menResMat[['2012']][ , 'ag'])
-
-tail(age)
-
-age = sapply(menResMat,function(x) as.numeric(x[ , 'ag']))
-
-
-pdf("CB_BoxplotAgeByYr.pdf", width = 8, height = 5)
-oldPar = par(mar = c(4.1, 4.1, 1, 1))
-
-boxplot(age, ylab = "Age", xlab = "Year")
-
-par(oldPar)
-dev.off()
-
-head(menFiles[['2003']])
-
-menFiles[['2006']][2200:2205]
-
-selectCols = function(shortColNames, headerRow, searchLocs) {
-  sapply(shortColNames, function(shortName, headerRow, searchLocs){
-    startPos = regexpr(shortName, headerRow)[[1]]
-    if (startPos == -1) return( c(NA, NA) )
-    index = sum(startPos >= searchLocs)
-    c(searchLocs[index] + 1, searchLocs[index + 1])
-  }, headerRow = headerRow, searchLocs = searchLocs )
-}
-
-menResMat = lapply(menFiles, extractVariables)
 #womenResMat = lapply(womenFiles, extractVariables)
 
-age = sapply(menResMat, 
-             function(x) as.numeric(x[ , 'ag']))
+age = sapply(menResMat, function(x) as.numeric(x[ , 'ag']))
 
 pdf("CB_BoxplotAgeByYrRevised.pdf", width = 8, height = 5)
 oldPar = par(mar = c(4.1, 4.1, 1, 1))
@@ -168,7 +129,7 @@ dev.off()
 
 sapply(age,  function(x) sum(is.na(x)))
 
-age2001 = age[["2001"]]
+age2001 = age[["2009"]]
 
 grep("^===", menFiles[['2001']])
 
