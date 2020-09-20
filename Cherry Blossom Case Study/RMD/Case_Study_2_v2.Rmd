@@ -40,7 +40,7 @@ opts_knit$set(width=75)
 
 # Code
 
-The code below gets the Cherry Blossom 10 Mile Race data from the [Cherry Blosson website](http://www.cherryblossom.org/) for 1999-2012 for both men and women runners. The HTML is parsed and the resuling lines of text are output to lists, one for men and one for women. Click the `Code` button to the right to expand the code for this section.
+The code below gets the Cherry Blossom 10 Mile Race data from the [Cherry Blosson website](http://www.cherryblossom.org/) for 1999-2012 for both men and women runners. The HTML is parsed and the resulting lines of text are output to lists, one for men and one for women. Click the `Code` button to the right to expand the code for this section.
 
 ```{r}
 ubase = "http://www.cherryblossom.org/"
@@ -63,7 +63,8 @@ extractResTable =
   # Retrieve data from web site, 
   # find the preformatted text,
   # and write lines or return as a character vector.
-  # returns a list of strings corrsponding to lines in the web url
+
+ # returns a list of strings corresponding to lines in the web url
   function(url = "http://www.cherryblossom.org/results/2009/09cucb-F.htm",
            year = 1999, sex = "male", file = NULL)
   {
@@ -259,13 +260,13 @@ women_final <- cb_Women1[cb_Women1$age > 10,]
 
 Data cleansing can be a very time intensive part of any analytical or statistical project, even if the data is already stored in tables. When data is not already stored in easily readable tables or files, data cleansing can be even more challenging and time consuming to accomplish. Web scraping, where data is pulled from the source of a webpage, is a real-world scenario often encountered when needing to gather data. 
 
-This case study focuses on Cherry Blossom 10-Mile Race results from 1999 - 2012. The data will be scraped from HTML on the [Cherry Blosson website](http://www.cherryblossom.org/). There is a separate URL for each race year and each gender, totalling 28 different URLs for the 14 years of data. Once the data has been cleansed, a detailed analysis age will be performed to identify how the distribution changes over time.
+This case study focuses on Cherry Blossom 10-Mile Race results from 1999 - 2012. The data will be scraped from HTML on the [Cherry Blosson website](http://www.cherryblossom.org/). There is a separate URL for each race year and each gender, totaling 28 different URLs for the 14 years of data. Once the data has been cleansed, a detailed analysis age will be performed to identify how the distribution changes over time.
 
 `Section 3` gives a background on the race and `Section 4` states the questions that will be answered in this case study. `Section 5` provides details about the variables present in the data and provides the steps taken to cleanse the data. Three different types of plots are shown in `Section 6` to compare the distributions of runner age over time: QQ plot, box plot and density plot. In `Section 7` results are presented. `Section 8` concludes the case study.
 
 # Background
 
-The Cherry Blossom 10 Mile Run is an annual race held in Washington, D.C. The race got its name because it is scheduled to coincide with the cherry blossom tree blooming season. The race started out as a qualifying event for the Boston Marathon, and over the years the race has become extremely popular for runners at all levels. Due to the race's populatiry, a lottery system is used to select race entries. The 2021 race will allow for approximately 15,000 runners spread through six different waves of 2,500 runners each.
+The Cherry Blossom 10 Mile Run is an annual race held in Washington, D.C. The race got its name because it is scheduled to coincide with the cherry blossom tree blooming season. The race started out as a qualifying event for the Boston Marathon, and over the years the race has become extremely popular for runners at all levels. Due to the race's popularity, a lottery system is used to select race entries. The 2021 race will allow for approximately 15,000 runners spread through six different waves of 2,500 runners each.
 
 Two other races are held in conjunction with the 10 Mile Run: the 5K Run-Walk and the Kid's Run. The proceeds from the Cherry Blossom races support the Children's Miracle Network Hospitals. 
 
@@ -295,11 +296,11 @@ Table 1: Variables of Interest
 
 Data cleanup is necessary to be able to use the files from the [Cherry Blosson website](http://www.cherryblossom.org/). What follows in this section is a discussion of the data clean-up steps taken. Please note that the majority of this code was taken from the Data Science in R textbook.
 
-The XML R package is used to scrape the data from the different URLs. Due to an issue with variable separting that occurrred when attempting to parse the men's 2009 data, UTF-8 encoding was used to extract the data. For most of the men's years, the text that needs to be extracted is found in <pre> nodes inside the HTML in the URL. xmlVALUE is used to extract the text from the <pre> node. \r\n indicates the end of a line and can be used to split the text pulled from the <pre> node into individual lines. There are a few files with exceptions that need to be addressed. First, the 1999 men's file uses a different end of line character: \n. Second, the 2000 men's file does not contain well-formed HTML becasue the HTML elements are not properly nested. Instead of looking in the <pre> node for the data, the <font> node will be used. Finally, the men's 2009 file presents several problems. It was already noted that there was an issue with separating variables, so the encoding was switched to UTF-8. There is also a different structure to navigate. Instead of obtaining data from the <pre> node, the data needs to be extracted from a <pre> node found inside <div[@class='Section1']>. An IF THEN ELSE statement is used to incorporate these exceptions into the code to scrape the data from the website.
+The XML R package is used to scrape the data from the different URLs. Due to an issue with variable separating that occurred when attempting to parse the men's 2009 data, UTF-8 encoding was used to extract the data. For most of the men's years, the text that needs to be extracted is found in <pre> nodes inside the HTML in the URL. xmlVALUE is used to extract the text from the <pre> node. \r\n indicates the end of a line and can be used to split the text pulled from the <pre> node into individual lines. There are a few files with exceptions that need to be addressed. First, the 1999 men's file uses a different end of line character: \n. Second, the 2000 men's file does not contain well-formed HTML because the HTML elements are not properly nested. Instead of looking in the <pre> node for the data, the <font> node will be used. Finally, the men's 2009 file presents several problems. It was already noted that there was an issue with separating variables, so the encoding was switched to UTF-8. There is also a different structure to navigate. Instead of obtaining data from the <pre> node, the data needs to be extracted from a <pre> node found inside <div[@class='Section1']>. An IF THEN ELSE statement is used to incorporate these exceptions into the code to scrape the data from the website.
 
 A list for the men's data and a list for the women's data is the output from the scraping step. The years are separated and at the top of each year's list are several header rows. Most of the years have a row of equal signs that are used to separate the header from the data. This row of equal signs is used to identify the layout of the text. There are spaces found in the row of equal signs to indicate the separation between one variable and another. Columns are separated by looking at the position of these spaces: a column begins one position after a space and ends one position before the subsequent space. A couple of adjustments are made to account for the first variable where the beginning is at the start of the line and to account for any files where the data spills over into the space after the column (in the men's 2003 file `age` ends in the space from the separator row).
 
-The code only pulls specific variables that are provided in a list: `name`, `home`, `ag`, `gun`, `net`, and `time`. The variable name is shortened to the minimum characters necessary to uniquely identify it in the text. For example, `home` is used instead of 'hometown' in case different spellings or abbreviations are found. The row that preceeds the seperator row of equal signs is searched for these variable names. Font case is addressed in the search as well to ensure that `AG` is recognized as `ag`.
+The code only pulls specific variables that are provided in a list: `name`, `home`, `ag`, `gun`, `net`, and `time`. The variable name is shortened to the minimum characters necessary to uniquely identify it in the text. For example, `home` is used instead of 'hometown' in case different spellings or abbreviations are found. The row that proceeds the separator row of equal signs is searched for these variable names. Font case is addressed in the search as well to ensure that `AG` is recognized as `ag`.
 
 Variable types also need to be addressed. `age` is formatted to be numeric and a function is run on the time variables to convert them from character to time.
 
@@ -310,6 +311,8 @@ The cleaned data is compiled into a single dataframe for men and a single datafr
 # Plots
 
 ## Q-Q
+
+We use Q-Q plots to examine whether the age distribution of male runners changed from 1999 to 2012. The animated Q-Q plots below show, year by year, the age distribution of runners versus the theoretical quantiles, assuming a normal distribution of ages. The animation keeps the 1999 data on the plot for reference, and shows that, as years go by, the Q-Q plot bows downward as the ages of runners decrease. Although this downward trend in age appears to occur gradually, the year 2004 appears to be the first large jump downward in age distribution. However, as we'll see in the boxplots and density plots in the following sections, the decrease in median age began occurring as early as 2001.
 
 ```{r}
 ## reduce to complete cases
