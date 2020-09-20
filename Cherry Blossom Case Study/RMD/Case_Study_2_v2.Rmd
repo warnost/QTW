@@ -24,6 +24,7 @@ library(ggplot2)
 library(gganimate)
 library(gifski)
 library(transformr)
+library(rcartocolor)
 
 ## Global options
 options(max.print="75")
@@ -39,7 +40,7 @@ opts_knit$set(width=75)
 
 # Code
 
-The code below gets the Cherry Blossom Race data from the [website](http://www.cherryblossom.org/) for 1999-2012 for both men and women runners. The HTML is parsed and the resuling lines of text are output to lists, one for men and one for women. Click the `Code` button to the right to expand the code for this section.
+The code below gets the Cherry Blossom 10 Mile Race data from the [Cherry Blosson website](http://www.cherryblossom.org/) for 1999-2012 for both men and women runners. The HTML is parsed and the resuling lines of text are output to lists, one for men and one for women. Click the `Code` button to the right to expand the code for this section.
 
 ```{r}
 ubase = "http://www.cherryblossom.org/"
@@ -126,7 +127,7 @@ names(womenTables) = years
 save(womenTables, file = "CBWomenTextTables.rda")
 ```
 
-The code below parses the data from the men and women runner lists and transforms the data into dataframes. Click the `Code` button to the right to expand the code for this section.
+The code below parses the data from the men and women runner lists and transforms the data into dataframes. Details about how the code is parsed are provided in `Section 5`. Click the `Code` button to the right to expand the code for this section.
 
 ```{r}
 convertTime = function(time) {
@@ -226,24 +227,29 @@ createDF = function(Res, year, sex) {
   invisible(Results)
 }
 
-## Load the mens tables
+# Load the mens tables
 load(file = "../Data/CBMenTextTables.rda")
 
-## Load the womens tables
+# Load the womens tables
 load(file = "../Data/CBWomenTextTables.rda")
 
+# Extract the variables for the men
 menResMat = sapply(menTables, extractVariables)
 menDF = mapply(createDF, menResMat, year = 1999:2012,sex = rep("M", 14), SIMPLIFY = FALSE)
 
+# Extract the variables for the women
 womenResMat = sapply(womenTables, extractVariables)
 womenDF = mapply(createDF, womenResMat, year = 1999:2012,sex = rep("F", 14), SIMPLIFY = FALSE)
 
+# Bind the lists by year together into dataframes, one for men and one for women
 cbMen = do.call(rbind, menDF)
 cbWomen = do.call(rbind, womenDF)
 
+# Men - Remove any observations where age is missing or the runner is less than 11 years old
 cb_Men1 <- cbMen[complete.cases(cbMen[,5]),]
 men_final <- cb_Men1[cb_Men1$age > 10,]
 
+# Women - Remove any observations where age is missing or the runner is less than 11 years old
 cb_Women1 <- cbWomen[complete.cases(cbWomen[,5]),]
 women_final <- cb_Women1[cb_Women1$age > 10,]
 
@@ -251,17 +257,55 @@ women_final <- cb_Women1[cb_Women1$age > 10,]
 
 # Introduction
 
+Data cleansing can be a very time intensive part of any analytical or statistical project, even if the data is already stored in tables. When data is not already stored in easily readable tables or files, data cleansing can be even more challenging and time consuming to accomplish. Web scraping, where data is pulled from the source of a webpage, is a real-world scenario often encountered when needing to gather data. 
+
+This case study focuses on Cherry Blossom 10-Mile Race results from 1999 - 2012. The data will be scraped from HTML on the [Cherry Blosson website](http://www.cherryblossom.org/). There is a separate URL for each race year and each gender, totalling 28 different URLs for the 14 years of data. Once the data has been cleansed, a detailed analysis age will be performed to identify how the distribution changes over time.
+
+`Section 3` gives a background on the race and `Section 4` states the questions that will be answered in this case study. `Section 5` provides details about the variables present in the data and provides the steps taken to cleanse the data. Three different types of plots are shown in `Section 6` to compare the distributions of runner age over time: QQ plot, box plot and density plot. In `Section 7` results are presented. `Section 8` concludes the case study.
+
 # Background
+
+The Cherry Blossom 10 Mile Run is an annual race held in Washington, D.C. The race got its name because it is scheduled to coincide with the cherry blossom tree blooming season. The race started out as a qualifying event for the Boston Marathon, and over the years the race has become extremely popular for runners at all levels. Due to the race's populatiry, a lottery system is used to select race entries. The 2021 race will allow for approximately 15,000 runners spread through six different waves of 2,500 runners each.
+
+Two other races are held in conjunction with the 10 Mile Run: the 5K Run-Walk and the Kid's Run. The proceeds from the Cherry Blossom races support the Children's Miracle Network Hospitals. 
 
 # Question
 
 We have seen that the 1999 runners were typically older than the 2012 runners. Compare the age distribution of the runners across all 14 years of the races. Use quantile–quantile plots, boxplots, and density curves to make your comparisons. How do the distributions change over the years? Was it a gradual change?  
 
+Both male and female data was scraped from the website, but only male data was used for this case study.
+
 # Methods
 
 ## Dataset
 
+The dataset for this case study is scraped from the [Cherry Blosson website](http://www.cherryblossom.org/). Results are separated by year and gender and the formatting for each dataset is not identical. `Table 1` presents details about the variables that are of interest for this case study. The resulting analysis on age will only use `year` and `age`.
+
+Table 1: Variables of Interest
+
+| Variable        | Description | 
+| ------- |-------------| 
+| Year | Year the race was run. | 
+| Name | First and last name of the runner. |
+| Home | City and State or Country of the runner. |
+| Age | Age of the runner. |
+| Run Time | Time it takes a runner to complete the race. |
+
 ## Dataset Cleanup
+
+Data cleanup is necessary to be able to use the files from the [Cherry Blosson website](http://www.cherryblossom.org/). What follows in this section is a discussion of the data clean-up steps taken. Please note that the majority of this code was taken from the Data Science in R textbook.
+
+The XML R package is used to scrape the data from the different URLs. Due to an issue with variable separting that occurrred when attempting to parse the men's 2009 data, UTF-8 encoding was used to extract the data. For most of the men's years, the text that needs to be extracted is found in <pre> nodes inside the HTML in the URL. xmlVALUE is used to extract the text from the <pre> node. \r\n indicates the end of a line and can be used to split the text pulled from the <pre> node into individual lines. There are a few files with exceptions that need to be addressed. First, the 1999 men's file uses a different end of line character: \n. Second, the 2000 men's file does not contain well-formed HTML becasue the HTML elements are not properly nested. Instead of looking in the <pre> node for the data, the <font> node will be used. Finally, the men's 2009 file presents several problems. It was already noted that there was an issue with separating variables, so the encoding was switched to UTF-8. There is also a different structure to navigate. Instead of obtaining data from the <pre> node, the data needs to be extracted from a <pre> node found inside <div[@class='Section1']>. An IF THEN ELSE statement is used to incorporate these exceptions into the code to scrape the data from the website.
+
+A list for the men's data and a list for the women's data is the output from the scraping step. The years are separated and at the top of each year's list are several header rows. Most of the years have a row of equal signs that are used to separate the header from the data. This row of equal signs is used to identify the layout of the text. There are spaces found in the row of equal signs to indicate the separation between one variable and another. Columns are separated by looking at the position of these spaces: a column begins one position after a space and ends one position before the subsequent space. A couple of adjustments are made to account for the first variable where the beginning is at the start of the line and to account for any files where the data spills over into the space after the column (in the men's 2003 file `age` ends in the space from the separator row).
+
+The code only pulls specific variables that are provided in a list: `name`, `home`, `ag`, `gun`, `net`, and `time`. The variable name is shortened to the minimum characters necessary to uniquely identify it in the text. For example, `home` is used instead of 'hometown' in case different spellings or abbreviations are found. The row that preceeds the seperator row of equal signs is searched for these variable names. Font case is addressed in the search as well to ensure that `AG` is recognized as `ag`.
+
+Variable types also need to be addressed. `age` is formatted to be numeric and a function is run on the time variables to convert them from character to time.
+
+Footnotes are removed by looking for `#` and any blank rows are removed.
+
+The cleaned data is compiled into a single dataframe for men and a single dataframe for women. Finally, an inspection of missing values indicates that the `age` variable does have missing values. The analysis that follows is on `age` so this needs to be addressed. The two methods available are to impute the missing ages or to remove those observations. For this case study, any observation with missing `age` is dropped because it is felt that there is a sufficient amount of data where this variable is not missing. There were also a handful of observations where the `age` of the runner was 10 or under. It would be expected that a 0 or 1 year old is not capable of running a race and the `age` for these observations is thought to be incorrect. However, at what age would it be expected that a child could run a 10 mile race? The [Cherry Blosson website](http://www.cherryblossom.org/) indicates that there is a Kid's Run where children between the ages of 4 and 10 may participate. Because of the age range for this race any runner with an `age` 10 or under is dropped from the data for the 10 mile run.
 
 # Plots
 
@@ -287,7 +331,7 @@ plot <- ggplot() +
         plot.subtitle = element_text(size=16),
         legend.title = element_blank(),
         axis.line = element_line(colour = "black")) + 
-  scale_colour_manual(values=c("black",wes_palette(n=14, name="FantasticFox1", type = "continuous")))+
+  scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75"))+
   transition_time(year) + 
   labs(title = "Q-Q Plot of Cherry Blossom Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
 
@@ -310,12 +354,15 @@ ggplot(men_final, aes(x=as.factor(year), y=age, color=as.factor(year))) +
         plot.subtitle = element_text(size=16),
         legend.title = element_blank(),
         axis.line = element_line(colour = "black")) +
-  scale_color_manual(values=c("black",wes_palette(n=14, name="FantasticFox1", type = "continuous"))) + 
+  scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75")) + 
   labs(title = "Age Boxplot of Cherry Blossom Runners (1999 - 2012)") +
   theme(legend.position="none") +
   xlab("") +
   ylab("Age") +
   geom_text(data=box_meds, aes(label=age, y=age+2), size=4)
+
+  #scale_color_manual(values=c("black",wes_palette(n=14, name="FantasticFox1", type = "continuous"))) + 
+  
 ```
 
 ## Density
