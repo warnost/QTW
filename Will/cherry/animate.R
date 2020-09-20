@@ -1,4 +1,5 @@
 library(gganimate)
+library(wesanderson)
 setwd("C:/Users/William/OneDrive/MSDS_7331_QTW/QTW/Will/cherry")
 
 ## reduce to complete cases
@@ -14,8 +15,11 @@ colourCount = length(unique(plt.data$year))
 getPalette = colorRampPalette(brewer.pal(9, "Set1"))
 
 
+only1999 <- plt.data %>% filter(year == 1999) %>% select(age)
+
 ## ggplot object
-anim<-ggplot(plt.data, aes(x=age, fill=as.factor(year))) + geom_density() + 
+anim<-ggplot(plt.data) + geom_density(aes(x=age, fill=as.factor(year))) + 
+  geom_density(data = only1999, aes(x=age)) +
   geom_vline(data=medians, aes(xintercept=median.age),
              linetype="dashed") +
   geom_text(data=medians, mapping=aes(x=median.age, y=0, label=text), size=4, angle=90, vjust=-0.4, hjust=0) +
