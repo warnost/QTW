@@ -271,17 +271,14 @@ We have seen that the 1999 runners were typically older than the 2012 runners. C
 ## reduce to complete cases
 plt.data <- men_final
 
-# This is the palette I used to attempt to make colors as distinct as possible while still maintaining some gradation
-new_pal = c(rev(brewer.pal(9,"YlGn")[3:7]), brewer.pal(9,"PuBu")[3:7], brewer.pal(9,"PuRd")[3:7])
+# Static dataset for comparing to 1999
+plt.1999 = plt.data[which(plt.data$year %in% c(1999)), ]
+plt.1999$year_1999 = plt.1999$year
+plt.1999$year = NULL
 
-# Static dataset for comparing to 2012
-plt.2012 = plt.data[which(plt.data$year %in% c(2012)), ]
-plt.2012$year_2012 = plt.2012$year
-plt.2012$year = NULL
-
-# QQ Plots comparing all years to 2012 to show that more recent years have lower age
+# QQ Plots comparing all years to 1999 to show that more recent years have lower age
 plot <- ggplot() +
-  stat_qq(aes(sample = age, color = as.factor(year_2012)), data = plt.2012) +
+  stat_qq(aes(sample = age, color = as.factor(year_1999)), data = plt.1999) +
   stat_qq(aes(sample = age, color = as.factor(year)), data = plt.data) +
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
@@ -290,9 +287,9 @@ plot <- ggplot() +
         plot.subtitle = element_text(size=16),
         legend.title = element_blank(),
         axis.line = element_line(colour = "black")) + 
-  scale_colour_manual(values=new_pal)+
+  scale_colour_manual(values=c("black",wes_palette(n=14, name="FantasticFox1", type = "continuous")))+
   transition_time(year) + 
-  labs(title = "Q-Q Plot of Cherry Blossom Runners (as compared to 2012)", subtitle = "Year: {frame_time}")
+  labs(title = "Q-Q Plot of Cherry Blossom Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
 
 my_anim = animate(last_plot(), duration = 40, end_pause = 20, height = 400, width = 600, renderer = gifski_renderer())
 my_anim
@@ -313,7 +310,7 @@ ggplot(men_final, aes(x=as.factor(year), y=age, color=as.factor(year))) +
         plot.subtitle = element_text(size=16),
         legend.title = element_blank(),
         axis.line = element_line(colour = "black")) +
-  scale_fill_manual(values=wes_palette(n=14, name="FantasticFox1", type = "continuous")) + 
+  scale_color_manual(values=c("black",wes_palette(n=14, name="FantasticFox1", type = "continuous"))) + 
   labs(title = "Age Boxplot of Cherry Blossom Runners (1999 - 2012)") +
   theme(legend.position="none") +
   xlab("") +
