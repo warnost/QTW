@@ -22,6 +22,11 @@ plt.data <- combined[complete.cases(combined),]
 # This is the palette I used to attempt to make colors as distinct as possible while still maintaining some gradation
 new_pal = c(rev(brewer.pal(9,"YlGn")[3:7]), brewer.pal(9,"PuBu")[3:7], brewer.pal(9,"PuRd")[3:7])
 
+# Static dataset for comparing to 2012
+plt.2012 = plt.data[which(plt.data$year %in% c(2012)), ]
+plt.2012$year_2012 = plt.2012$year
+plt.2012$year = NULL
+
 # QQ Plots comparing all years to 2012 to show that more recent years have lower age
 plot <- ggplot() +
   stat_qq(aes(sample = age, color = as.factor(year_2012)), data = plt.2012) +
