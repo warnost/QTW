@@ -227,10 +227,10 @@ createDF = function(Res, year, sex) {
 }
 
 ## Load the mens tables
-load(file = "CBMenTextTables.rda")
+load(file = "../Data/CBMenTextTables.rda")
 
 ## Load the womens tables
-load(file = "CBWomenTextTables.rda")
+load(file = "../Data/CBWomenTextTables.rda")
 
 menResMat = sapply(menTables, extractVariables)
 menDF = mapply(createDF, menResMat, year = 1999:2012,sex = rep("M", 14), SIMPLIFY = FALSE)
@@ -293,14 +293,20 @@ ggplot(men_final, aes(x=as.factor(year), y=age, color=as.factor(year))) +
 ## Density
 
 ```{r}
+plt.data <- men_final
+
 ## Calculate Medians and annotation text
-box_meds$text <- paste(box_meds$year, "Median Age:",box_meds$age)
+medians <- plt.data %>% select(year,age) %>% group_by(year) %>% summarise(median.age=median(age))
+medians$text <- paste(medians$year, "Median Age:",medians$median.age)
+
+only1999 <- plt.data %>% filter(year == 1999) %>% select(age)
 
 ## ggplot object
-anim<-ggplot(men_final, aes(x=age, fill=as.factor(year))) + 
-  geom_density() + 
-  geom_vline(data=box_meds, aes(xintercept=age), linetype="dashed") +
-  geom_text(data=box_meds, mapping=aes(x=age, y=0, label=text), size=4, angle=90, vjust=-0.4, hjust=0) +
+anim<-ggplot(plt.data) + geom_density(aes(x=age, fill=as.factor(year))) + 
+  geom_density(data = only1999, aes(x=age)) +
+  geom_vline(data=medians, aes(xintercept=median.age),
+             linetype="dashed") +
+  geom_text(data=medians, mapping=aes(x=median.age, y=0, label=text), size=4, angle=90, vjust=-0.4, hjust=0) +
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         panel.background = element_blank(),
@@ -313,10 +319,11 @@ anim<-ggplot(men_final, aes(x=age, fill=as.factor(year))) +
   labs(title = "Age Distribution of Cherry Blossom Runners (1999 - 2012)", subtitle = "Year: {frame_time}")
 
 ## animate it
-anim2 <- animate(anim, duration = 40, end_pause = 20, height = 400, width = 600, renderer = gifski_renderer())
+anim2 <- animate(anim, duration = 40, end_pause = 20, height = 400, width = 600)
 
 ## Save the gif
 anim_save(file='density_v3.gif',animation = anim2)
+
 ```
 
 
