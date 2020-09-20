@@ -1,0 +1,66 @@
+---
+title: "Case Study - Cherry Blossom Race"
+date: "`r Sys.Date()`"
+author: "Allison Roderick, Jenna Ford, William Arnost"
+output:
+  rmdformats::readthedown:
+    number_sections: true
+    code_folding: hide
+    highlight: kate
+    toc_depth: 3
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE, include=FALSE}
+library(knitr)
+library(rmdformats)
+library(formatR)
+library(naniar)
+library(tidyverse)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Code
+
+# Introduction
+
+# Background
+
+# Question
+
+We have seen that the 1999 runners were typically older than the 2012 runners. Compare the age distribution of the runners across all 14 years of the races. Use quantile–quantile plots, boxplots, and density curves to make your comparisons. How do the distributions change over the years? Was it a gradual change?  
+
+# Methods
+
+## Dataset
+
+## Dataset Cleanup
+
+# Plots
+
+## Q-Q
+
+## boxplot
+
+## density
+
+
+# Results
+
+How do the distributions change over the years? Was it a gradual change?
+
+# Conclusion
+
+# References 
+
+
