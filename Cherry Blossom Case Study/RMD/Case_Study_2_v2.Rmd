@@ -17,6 +17,13 @@ library(rmdformats)
 library(formatR)
 library(naniar)
 library(tidyverse)
+library(XML)
+library(RColorBrewer)
+library(wesanderson)
+library(ggplot2)
+library(gganimate)
+library(gifski)
+library(transformr)
 
 ## Global options
 options(max.print="75")
@@ -31,6 +38,216 @@ opts_knit$set(width=75)
 ```
 
 # Code
+
+The code below gets the Cherry Blossom Race data from the [website](http://www.cherryblossom.org/) for 1999-2012 for both men and women runners. The HTML is parsed and the resuling lines of text are output to lists, one for men and one for women. Click the `Code` button to the right to expand the code for this section.
+
+```{r}
+ubase = "http://www.cherryblossom.org/"
+menURLs = 
+  c("results/1999/cb99m.html", "results/2000/Cb003m.htm", "results/2001/oof_m.html",
+    "results/2002/oofm.htm", "results/2003/CB03-M.HTM",
+    "results/2004/men.htm", "results/2005/CB05-M.htm", 
+    "results/2006/men.htm", "results/2007/men.htm", 
+    "results/2008/men.htm", "results/2009/09cucb-M.htm",
+    "results/2010/2010cucb10m-m.htm", 
+    "results/2011/2011cucb10m-m.htm",
+    "results/2012/2012cucb10m-m.htm")
+
+urls = paste(ubase, menURLs, sep = "")
+
+extractResTable =
+  # takes a list of websites from the cherry blossom race
+  # a list of years corresponding to the year the result is for
+  # and the gender of the participant
+  # Retrieve data from web site, 
+  # find the preformatted text,
+  # and write lines or return as a character vector.
+  # returns a list of strings corrsponding to lines in the web url
+  function(url = "http://www.cherryblossom.org/results/2009/09cucb-F.htm",
+           year = 1999, sex = "male", file = NULL)
+  {
+    doc = htmlParse(url, encoding = "utf-8")
+    
+    if (year == 2000) {
+      # Get preformatted text from 4th font element
+      # The top file is ill formed so the <pre> search doesn't work.
+      ff = getNodeSet(doc, "//font")
+      txt = xmlValue(ff[[4]])
+      els = strsplit(txt, "\r\n")[[1]]
+    }
+    else if (year == 2009 & sex == "male") {
+      # Get preformatted text from <div class="Section1"> element
+      # Each line of results is in a <pre> element
+      div1 = getNodeSet(doc, "//div[@class='Section1']")
+      pres = getNodeSet(div1[[1]], "//pre")
+      els = sapply(pres, xmlValue)
+      els = gsub("Â", " ", els)
+    }
+    else if (year == 1999) {
+      # Get preformatted text from <pre> elements
+      pres = getNodeSet(doc, "//pre")
+      txt = xmlValue(pres[[1]])
+      els = strsplit(txt, "\n")[[1]]   
+    } 
+    else {
+      # Get preformatted text from <pre> elements
+      pres = getNodeSet(doc, "//pre")
+      txt = xmlValue(pres[[1]])
+      els = strsplit(txt, "\r\n")[[1]]   
+    } 
+    
+    if (is.null(file)) return(els)
+    # Write the lines as a text file.
+    writeLines(els, con = file)
+  }
+
+
+years = 1999:2012
+menTables = mapply(extractResTable, url = urls, year = years)
+names(menTables) = years
+
+save(menTables, file = "CBMenTextTables.rda")
+
+womenURLs = 
+  c("results/1999/cb99f.html", "results/2000/Cb003f.htm", "results/2001/oof_f.html",
+    "results/2002/ooff.htm", "results/2003/CB03-F.HTM",
+    "results/2004/women.htm", "results/2005/CB05-F.htm", 
+    "results/2006/women.htm", "results/2007/women.htm", 
+    "results/2008/women.htm", "results/2009/09cucb-F.htm",
+    "results/2010/2010cucb10m-F.htm", 
+    "results/2011/2011cucb10m-F.htm",
+    "results/2012/2012cucb10m-F.htm")
+
+urls = paste(ubase, womenURLs, sep = "")
+
+womenTables = mapply(extractResTable, url = urls, year = years, sex = "female")
+names(womenTables) = years
+
+save(womenTables, file = "CBWomenTextTables.rda")
+```
+
+The code below parses the data from the men and women runner lists and transforms the data into dataframes. Click the `Code` button to the right to expand the code for this section.
+
+```{r}
+convertTime = function(time) {
+  timePieces = strsplit(time, ":")
+  timePieces = sapply(timePieces, as.numeric)
+  sapply(timePieces, function(x) {
+    if (length(x) == 2) x[1] + x[2]/60
+    else 60*x[1] + x[2] + x[3]/60
+  })
+}
+
+findColLocs = function(spacerRow) {
+  
+  # starting indexes of columns
+  spaceLocs = gregexpr(" ", spacerRow)[[1]]
+  rowLength = nchar(spacerRow)
+  
+  if (substring(spacerRow, rowLength, rowLength) != " ")
+    return( c(0, spaceLocs, rowLength + 1))
+  else return(c(0, spaceLocs))
+}
+
+selectCols = function(shortColNames, headerRow, searchLocs) {
+  sapply(shortColNames, function(shortName, headerRow, searchLocs){
+    startPos = regexpr(shortName, headerRow)[[1]]
+    if (startPos == -1) return( c(NA, NA) )
+    index = sum(startPos >= searchLocs)
+    #below is the change
+    c(searchLocs[index] + 1, searchLocs[index + 1])
+  }, headerRow = headerRow, searchLocs = searchLocs )
+}
+
+extractVariables = function(file,varNames =c("name", "home", "ag", "gun","net", "time")) {
+  # Find the index of the row with =s
+  eqIndex = grep("^===", file)
+  
+  if(is_empty(eqIndex)) {
+    headerRow = tolower("PLACE NUM   NAME                  AG HOMETOWN           NET     GUN")
+    spacerRow ="===== ===== ===================== == ================== ======= ======="
+    body = file
+  } else {
+  # Extract the two key rows and the data 
+  spacerRow = file[eqIndex] 
+  headerRow = tolower(file[ eqIndex - 1 ])
+  body = file[ -(1 : eqIndex) ]
+  }
+  # I added this part to correct some issues happening in the women files, but it shouldn't affect the men files
+  headerRow = gsub('hometown',
+                   'home    ', headerRow)
+  headerRow = gsub('gun tim',
+                   'gun    ', headerRow)
+  headerRow = gsub('net tim',
+                   'net    ', headerRow)
+
+  
+  # Remove footnotes and blank rows
+  footnotes = grep("^[[:blank:]]*(\\*|\\#)", body)
+  if ( length(footnotes) > 0 ) body = body[ -footnotes ]
+  blanks = grep("^[[:blank:]]*$", body)
+  if (length(blanks) > 0 ) body = body[ -blanks ]
+  
+  
+  # Obtain the starting and ending positions of variables   
+  searchLocs = findColLocs(spacerRow)
+  
+  ## 2006 has an issue with the column locations
+  if (grepl("2006",file[4])) searchLocs <- c(0,6,15,22,45,48,64,72,80,81,87,89)
+  
+  locCols = selectCols(varNames, headerRow, searchLocs)
+  
+  Values = mapply(substr, list(body), start = locCols[1, ], 
+                  stop = locCols[2, ])
+  colnames(Values) = varNames
+  
+  return(Values)
+}
+
+createDF = function(Res, year, sex) {
+  # Determine which time to use
+  if ( !is.na(Res[1, 'net']) ) useTime = Res[ , 'net']
+  else if ( !is.na(Res[1, 'gun']) ) useTime = Res[ , 'gun']
+  else useTime = Res[ , 'time']
+  
+  # Remove # and * and blanks from time
+  useTime = gsub("[#\\*[:blank:]]", "", useTime)
+  runTime = convertTime(useTime[ useTime != "" ])
+  
+  # Drop rows with no time
+  Res = Res[ useTime != "", ]
+  
+  Results = data.frame(year = rep(year, nrow(Res)),
+                       sex = rep(sex, nrow(Res)),
+                       name = Res[ , 'name'], home = Res[ , 'home'],
+                       age = as.numeric(Res[, 'ag']), 
+                       runTime = runTime,
+                       stringsAsFactors = FALSE)
+  invisible(Results)
+}
+
+## Load the mens tables
+load(file = "CBMenTextTables.rda")
+
+## Load the womens tables
+load(file = "CBWomenTextTables.rda")
+
+menResMat = sapply(menTables, extractVariables)
+menDF = mapply(createDF, menResMat, year = 1999:2012,sex = rep("M", 14), SIMPLIFY = FALSE)
+
+womenResMat = sapply(womenTables, extractVariables)
+womenDF = mapply(createDF, womenResMat, year = 1999:2012,sex = rep("F", 14), SIMPLIFY = FALSE)
+
+cbMen = do.call(rbind, menDF)
+cbWomen = do.call(rbind, womenDF)
+
+cb_Men1 <- cbMen[complete.cases(cbMen[,5]),]
+men_final <- cb_Men1[cb_Men1$age > 10,]
+
+cb_Women1 <- cbWomen[complete.cases(cbWomen[,5]),]
+women_final <- cb_Women1[cb_Women1$age > 10,]
+
+```
 
 # Introduction
 
@@ -50,9 +267,57 @@ We have seen that the 1999 runners were typically older than the 2012 runners. C
 
 ## Q-Q
 
-## boxplot
+## Boxplot
 
-## density
+```{r}
+box_meds <- aggregate(age ~ as.factor(year), men_final, median)
+names(box_meds) <- c("year","age")
+
+ggplot(men_final, aes(x=as.factor(year), y=age, color=as.factor(year))) +
+  geom_boxplot() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        plot.title = element_text(size=16),
+        plot.subtitle = element_text(size=16),
+        legend.title = element_blank(),
+        axis.line = element_line(colour = "black")) +
+  scale_fill_manual(values=wes_palette(n=14, name="FantasticFox1", type = "continuous")) + 
+  labs(title = "Age Boxplot of Cherry Blossom Runners (1999 - 2012)") +
+  theme(legend.position="none") +
+  xlab("") +
+  ylab("Age") +
+  geom_text(data=box_meds, aes(label=age, y=age+2), size=4)
+```
+
+## Density
+
+```{r}
+## Calculate Medians and annotation text
+box_meds$text <- paste(box_meds$year, "Median Age:",box_meds$age)
+
+## ggplot object
+anim<-ggplot(men_final, aes(x=age, fill=as.factor(year))) + 
+  geom_density() + 
+  geom_vline(data=box_meds, aes(xintercept=age), linetype="dashed") +
+  geom_text(data=box_meds, mapping=aes(x=age, y=0, label=text), size=4, angle=90, vjust=-0.4, hjust=0) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        plot.title = element_text(size=16),
+        plot.subtitle = element_text(size=16),
+        legend.title = element_blank(),
+        axis.line = element_line(colour = "black")) +
+  scale_fill_manual(values=wes_palette(n=14, name="FantasticFox1", type = "continuous")) + 
+  transition_time(year) +
+  labs(title = "Age Distribution of Cherry Blossom Runners (1999 - 2012)", subtitle = "Year: {frame_time}")
+
+## animate it
+anim2 <- animate(anim, duration = 40, end_pause = 20, height = 400, width = 600, renderer = gifski_renderer())
+
+## Save the gif
+anim_save(file='density_v3.gif',animation = anim2)
+```
 
 
 # Results

@@ -40,13 +40,10 @@ Use the `code` button to the right to expand the code for cleaning up the datase
 ```{r datapull1, include=FALSE}
 
 ## Load the mens tables
-setwd("C:/Users/b007224/Documents/masters_in_data_science/quantifying_the_world/QTW/Will/cherry")
 load(file = "C:/Users/b007224/Documents/masters_in_data_science/quantifying_the_world/QTW/Will/cherry/CBMenTextTables.rda")
-print("List menTables read in")
 
 ## Load the womens tables
 load(file = "C:/Users/b007224/Documents/masters_in_data_science/quantifying_the_world/QTW/Will/cherry/CBWomenTextTables.rda")
-print("List womenTables read in")
 
 # search for spaces in the row of equals to identify columns
 findColLocs = function(spacerRow) {
@@ -72,72 +69,6 @@ selectCols = function(shortColNames, headerRow, searchLocs) {
   }, headerRow = headerRow, searchLocs = searchLocs )
 }
 
- ######## still need to drop that last line with blanks all the way across ########
-
-extractVariables = 
-  # list of columns we want to keep, only need to put enough letters to uniquely identify the columns
-  function(file, varNames =c("name", "home", "ag", "gun","net", "time"))
-    {
-      # Find the index of the row with =s
-      eqIndex = grep("^===", file)
-      
-      # grab the row of =
-      spacerRow = file[eqIndex] 
-      # grab the row before the row of =, this is the header. AND change the text to lowercase for consistency to other files
-      headerRow = tolower(file[ eqIndex - 1 ])
-      #for the body, keep only rows after the row of =
-      body = file[ -(1 : eqIndex) ]
-           
-      # use the function to find the spaces in the row of =, these are the beginning/ending positions for the columns
-      searchLocs = findColLocs(spacerRow)
-      # identify the beinning and ending positions for the selected columns
-      locCols = selectCols(varNames, headerRow, searchLocs)
-    
-      # get the data for these selected columns, output is a matrix
-      Values = mapply(substr, list(body), start = locCols[1, ], 
-                      stop = locCols[2, ])
-      # add column headings
-      colnames(Values) = varNames
-      
-      invisible(Values)
-    }
-
-# apply extractVariables function to dataset
-menResMat = lapply(menTables, extractVariables)
-
-### The 2001 results for women are missing the === and the column names.
-### Can we pick it up from the 2001 men? YES! Make an exercise
-#wfilenames = paste("WomenTxt/", 1999:2012, ".txt", sep = "")
-#womenTables = lapply(wfilenames, readLines)
-
-#womenTables[[3]][1:5]
-
-#names(womenTables) = 1999:2012
-#womenResMat = lapply(womenTables, extractVariables)
-#head(womenResMat[[3]], 10)
-#tail(womenResMat[[3]], 10)
-
-#womenResMat = lapply(womenFiles, extractVariables)
-
-age = sapply(menResMat, function(x) as.numeric(x[ , 'ag']))
-
-pdf("CB_BoxplotAgeByYrRevised.pdf", width = 8, height = 5)
-oldPar = par(mar = c(4.1, 4.1, 1, 1))
-boxplot(age, ylab = "Age", xlab = "Year")
-par(oldPar)
-dev.off()
-
-sapply(age,  function(x) sum(is.na(x)))
-
-age2001 = age[["2009"]]
-
-grep("^===", menFiles[['2001']])
-
-badAgeIndex = which(is.na(age2001)) + 5
-menFiles[['2001']][ badAgeIndex ]
- 
-badAgeIndex
-
 extractVariables = 
 function(file, varNames =c("name", "home", "ag", "gun",
                            "net", "time"))
@@ -145,55 +76,35 @@ function(file, varNames =c("name", "home", "ag", "gun",
   
   # Find the index of the row with =s
   eqIndex = grep("^===", file)
+  
   # Extract the two key rows and the data 
   spacerRow = file[eqIndex] 
   headerRow = tolower(file[ eqIndex - 1 ])
   body = file[ -(1 : eqIndex) ]
-       # Remove footnotes and blank rows
+  
+  # Remove footnotes and blank rows
   footnotes = grep("^[[:blank:]]*(\\*|\\#)", body)
   if ( length(footnotes) > 0 ) body = body[ -footnotes ]
   blanks = grep("^[[:blank:]]*$", body)
   if (length(blanks) > 0 ) body = body[ -blanks ]
   
-  
   # Obtain the starting and ending positions of variables   
   searchLocs = findColLocs(spacerRow)
   locCols = selectCols(varNames, headerRow, searchLocs)
   
-  Values = mapply(substr, list(body), start = locCols[1, ], 
-                  stop = locCols[2, ])
+  Values = mapply(substr, list(body), start = locCols[1, ], stop = locCols[2, ])
   colnames(Values) = varNames
   
   return(Values)
 }
 
-menResMat = lapply(menFiles, extractVariables)
-#womenResMat = lapply(womenFiles, extractVariables)
+# apply extractVariables function to dataset
+menResMat = lapply(menTables, extractVariables)
+#womenResMat = lapply(womenTables, extractVariables)
 
-which(age2001 < 5)
+age = sapply(menResMat, function(x) as.numeric(x[ , 'ag']))
 
-menFiles[['2001']][ which(age2001 < 5) + 5 ]
-
-charTime = menResMat[['2012']][, 'time']
-head(charTime, 5)
-
-tail(charTime, 5)
-
-timePieces = strsplit(charTime, ":")
-
-timePieces[[1]]
-
-tail(timePieces, 1)
-
-timePieces = sapply(timePieces, as.numeric)
-
-runTime = sapply(timePieces, 
-                 function(x) {
-                   if (length(x) == 2) x[1] + x[2]/60
-                   else 60*x[1] + x[2] + x[3]/60
-                 })
-
-summary(runTime)
+boxplot(age, ylab = "Age", xlab = "Year")
 
 convertTime = function(time) {
   timePieces = strsplit(time, ":")
@@ -203,36 +114,6 @@ convertTime = function(time) {
                       else 60*x[1] + x[2] + x[3]/60
                       })
 }
-
-createDF = 
-function(Res, year, sex) 
-{
-       # Determine which time to use
-  useTime = if( !is.na(Res[1, 'net']) )  
-              Res[ , 'net']
-            else if( !is.na(Res[1, 'gun']) ) 
-               Res[ , 'gun']
-            else 
-               Res[ , 'time']
-
-  runTime = convertTime(useTime)
-  
-  Results = data.frame(year = rep(year, nrow(Res)),
-                       sex = rep(sex, nrow(Res)),
-                       name = Res[ , 'name'],
-                       home = Res[ , 'home'],
-                       age = as.numeric(Res[, 'ag']), 
-                       runTime = runTime,
-                       stringsAsFactors = FALSE)
-  invisible(Results)
-}
-
-menDF = mapply(createDF, menResMat, year = 1999:2012,
-               sex = rep("M", 14), SIMPLIFY = FALSE)
-
-warnings()[ c(1:2, 49:50) ]
-
-sapply(menDF, function(x) sum(is.na(x$runTime)))
 
 createDF = function(Res, year, sex) 
 {
@@ -257,21 +138,15 @@ createDF = function(Res, year, sex)
   invisible(Results)
 }
 
-menDF = mapply(createDF, menResMat, year = 1999:2012,
-               sex = rep("M", 14), SIMPLIFY = FALSE)
-
-sapply(menDF, function(x) sum(is.na(x$runTime)))
-
-separatorIdx = grep("^===", menFiles[["2006"]])
-separatorRow = menFiles[['2006']][separatorIdx]
+separatorIdx = grep("^===", menTables[["2006"]])
+separatorRow = menTables[['2006']][separatorIdx]
 separatorRowX = paste(substring(separatorRow, 1, 63), " ", 
                       substring(separatorRow, 65, nchar(separatorRow)), 
                       sep = "")
-menFiles[['2006']][separatorIdx] = separatorRowX
+menTables[['2006']][separatorIdx] = separatorRowX
 
-menResMat = sapply(menFiles, extractVariables)
-menDF = mapply(createDF, menResMat, year = 1999:2012,
-               sex = rep("M", 14), SIMPLIFY = FALSE)
+menResMat = sapply(menTables, extractVariables)
+menDF = mapply(createDF, menResMat, year = 1999:2012, sex = rep("M", 14), SIMPLIFY = FALSE)
 
 #separatorIdx = grep("^===", womenFiles[["2006"]])
 #separatorRow = womenFiles[['2006']][separatorIdx]
@@ -284,26 +159,15 @@ menDF = mapply(createDF, menResMat, year = 1999:2012,
 #womenDF = mapply(createDF, womenResMat, year = 1999:2012,
 #               sex = rep("W", 14), SIMPLIFY = FALSE)
 
-pdf("CB_BoxplotTimeByYr.pdf", width = 8, height = 5)
-boxplot(sapply(menDF, function(x) x$runTime), 
-        xlab = "Year", ylab = "Run Time (min)")
-dev.off()
+boxplot(sapply(menDF, function(x) x$runTime), xlab = "Year", ylab = "Run Time (min)")
+
 
 cbMen = do.call(rbind, menDF)
 save(cbMen, file = "cbMen.rda")
 
-dim(cbMen)
-
 load("cbMen.rda")
 
-pdf("CB_Overplot.pdf", width = 8, height = 6)
-oldPar = par(mar = c(4.1, 4.1, 1, 1))
-
-plot(runTime ~ age, data = cbMen, ylim = c(40, 180),
-     xlab = "Age (years)", ylab = "Run Time (minutes)")
-
-par(oldPar)
-dev.off()
+plot(runTime ~ age, data = cbMen, ylim = c(40, 180), xlab = "Age (years)", ylab = "Run Time (minutes)")
 
 library(RColorBrewer)
 ls("package:RColorBrewer")
@@ -315,40 +179,23 @@ Purples8
 
 Purples8A = paste(Purples8, "14", sep = "")
 
-pdf("CB_OverplotTransparent.pdf", width = 8, height = 6)
-oldPar = par(mar = c(4.1, 4.1, 1, 1))
 plot(runTime ~ jitter(age, amount = 0.5), 
      data = cbMen, 
      pch = 19,cex = 0.2, col = Purples8A,
      ylim = c(45, 165), xlim = c(15, 85),
      xlab = "Age (years)", ylab = "Run Time (minutes)")
-par(oldPar)
-dev.off()
 
-pdf("CB_SmoothScatter.pdf", width = 8, height = 6)
-oldPar = par(mar = c(4.1, 4.1, 1, 1))
 
 smoothScatter(y = cbMen$runTime, x = cbMen$age,
               ylim = c(40, 165), xlim = c(15, 85),
               xlab = "Age (years)", ylab = "Run Time (minutes)")
 
-par(oldPar)
-dev.off()
-
-cbMenSub = cbMen[cbMen$runTime > 30 &
-                 !is.na(cbMen$age) & cbMen$age > 15, ]
+cbMenSub = cbMen[cbMen$runTime > 30 & !is.na(cbMen$age) & cbMen$age > 15, ]
 
 ageCat = cut(cbMenSub$age, breaks = c(seq(15, 75, 10), 90))
 table(ageCat)
 
-pdf("CB_Boxplots.pdf", width = 8, height = 6)
-oldPar = par(mar = c(4.1, 4.1, 1, 1))
-
-plot(cbMenSub$runTime ~ ageCat, 
-     xlab = "Age (years)", ylab = "Run Time (minutes)")
-
-par(oldPar)
-dev.off()
+plot(cbMenSub$runTime ~ ageCat, xlab = "Age (years)", ylab = "Run Time (minutes)")
 
 lmAge = lm(runTime ~ age, data = cbMenSub)
 
@@ -358,25 +205,17 @@ summary(lmAge)
 
 class(lmAge)
 
-pdf("CB_ResidSimpleLM.pdf", width = 8, height = 6)
-oldPar = par(mar = c(4.1, 4.1, 1, 1))
-
 smoothScatter(x = cbMenSub$age, y = lmAge$residuals,
               xlab = "Age (years)", ylab = "Residuals")
 abline(h = 0, col = "purple", lwd = 3)
  
-resid.lo = loess(resids ~ age, 
-                 data = data.frame(resids = residuals(lmAge),
-                                   age = cbMenSub$age))
+resid.lo = loess(resids ~ age, data = data.frame(resids = residuals(lmAge),age = cbMenSub$age))
 
 age20to80 = 20:80
 
-resid.lo.pr = 
-  predict(resid.lo, newdata = data.frame(age = age20to80))
+resid.lo.pr = predict(resid.lo, newdata = data.frame(age = age20to80))
 
 lines(x = age20to80, y = resid.lo.pr, col = "green", lwd = 2)
-par(oldPar)
-dev.off()
 
 menRes.lo = loess(runTime ~ age, cbMenSub)
 
