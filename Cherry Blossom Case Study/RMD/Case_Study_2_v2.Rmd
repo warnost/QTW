@@ -384,6 +384,10 @@ ggplot(men_final, aes(x=as.factor(year), y=age, color=as.factor(year))) +
 
 ## Density
 
+`Figure 3` is a density chart, a smoothed version of the histogram, which helps us understand how many runners there are at each age. The more runners there are for a certain age, the higher the curve will be at that point. It can also help us understand if the distribution is skewed. The normal distribution would have a peak at the mean/median and be symmetrical, where a skewed distribution would have a long tail on one side. 
+
+Looking at the density for 1999, it is not quite symmetrical but its peak is near the median age of 40. As the years pass, the age distribution becomes increasingly right skewed, indicating an increase in younger runners. You can see the median age decrease to 35 by 2012, with the peak moving to the left of the median. There is not much shift from 2011 to 2012, it is possible that the distribution of age might be stabilizing, but we would need to confirm with more data.  
+
 ```{r}
 plt.data <- men_final
 
@@ -392,13 +396,15 @@ medians <- plt.data %>% select(year,age) %>% group_by(year) %>% summarise(median
 medians$text <- paste(medians$year, "Median Age:",medians$median.age)
 
 only1999 <- plt.data %>% filter(year == 1999) %>% select(age)
+med99 <-medians%>% filter(year == 1999) %>% select(median.age, text)
 
 ## ggplot object
 anim<-ggplot(plt.data) + geom_density(aes(x=age, fill=as.factor(year))) + 
   geom_density(data = only1999, aes(x=age)) +
-  geom_vline(data=medians, aes(xintercept=median.age),
-             linetype="dashed") +
+  geom_vline(data=medians, aes(xintercept=median.age), linetype="dashed") +
+  geom_vline(data=med99, aes(xintercept=median.age), linetype="dashed") +
   geom_text(data=medians, mapping=aes(x=median.age, y=0, label=text), size=4, angle=90, vjust=-0.4, hjust=0) +
+  geom_text(data=med99, mapping=aes(x=median.age, y=0, label=text), size=4, angle=90, vjust=1.1, hjust=0) +
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         panel.background = element_blank(),
@@ -406,20 +412,19 @@ anim<-ggplot(plt.data) + geom_density(aes(x=age, fill=as.factor(year))) +
         plot.subtitle = element_text(size=16),
         legend.title = element_blank(),
         axis.line = element_line(colour = "black")) +
-  scale_fill_manual(values=wes_palette(n=14, name="FantasticFox1", type = "continuous")) + 
+  scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75")) +
   transition_time(year) +
-  labs(title = "Age Distribution of Cherry Blossom Runners (1999 - 2012)", subtitle = "Year: {frame_time}")
+  labs(title = "Figure 3: Age Distribution of Cherry Blossom Runners (1999 - 2012)", subtitle = "Year: {frame_time}")
 
 ## animate it
 anim2 <- animate(anim, duration = 40, end_pause = 20, height = 400, width = 600)
-
 anim2
 
 ```
 
 # Results
 
-How do the distributions change over the years? Was it a gradual change?
+The median age of Runners in the Cherry Blossom race has been going down between 1999 and 2012. The results from each of our figures show the median age shifting from 40 in 1999 to 35 in 2012. The change starts out gradual but changes more rapidly from 2007 to 2009. There seems to be some stabilization in the last couple of years but we would need to look at additional data to confirm.  
 
 # References 
 
