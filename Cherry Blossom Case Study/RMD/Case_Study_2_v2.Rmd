@@ -312,7 +312,9 @@ The cleaned data is compiled into a single dataframe for men and a single datafr
 
 ## Q-Q
 
-We use Q-Q plots to examine whether the age distribution of male runners changed from 1999 to 2012. The animated Q-Q plots below show, year by year, the age distribution of runners versus the theoretical quantiles, assuming a normal distribution of ages. The animation keeps the 1999 data on the plot for reference, and shows that, as years go by, the Q-Q plot bows downward as the ages of runners decrease. Although this downward trend in age appears to occur gradually, the year 2004 appears to be the first large jump downward in age distribution. However, as we'll see in the boxplots and density plots in the following sections, the decrease in median age began occurring as early as 2001.
+We use Q-Q plots to examine whether the age distribution of male runners changed from 1999 to 2012. The animated Q-Q plots below show, year by year, the age distribution of runners versus the theoretical quantiles, assuming a normal distribution of ages. That is, the y-axis represents runner age, while the x-axis is the theoretical quartile based on a normal distribution. Data points near the 0 theoretical quartile are close to the mean age, while points near -2 and 2 quartiles represent extreme low ages and extreme high ages respectively. Q-Q plots that are straight lines with a positive slope, like the 1999 data, come from relatively normal data, which is evidenced by the density plots in a later section.
+
+The animation keeps the 1999 data on the plot for reference, and shows that, as years go by, the Q-Q plot bows downward as the ages of runners decrease. The bowing downward corresponds to a right skewed distribution of ages, also shown in the density plots. Although this downward trend in age appears to occur gradually, the year 2004 appears to be the first large jump downward in age distribution. However, as we'll see in the boxplots and density plots in the following sections, the gradual decrease in median age began occurring as early as 2001.
 
 ```{r}
 ## reduce to complete cases
