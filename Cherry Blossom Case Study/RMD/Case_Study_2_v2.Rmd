@@ -262,7 +262,7 @@ Data cleansing can be a very time intensive part of any analytical or statistica
 
 This case study focuses on Cherry Blossom 10-Mile Race results from 1999 - 2012. The data will be scraped from HTML on the [Cherry Blossom website](http://www.cherryblossom.org/). There is a separate URL for each race year and each gender, totaling 28 different URLs for the 14 years of data. Once the data has been cleansed, a detailed analysis age will be performed to identify how the distribution changes over time.
 
-`Section 3` gives a background on the race and `Section 4` states the questions that will be answered in this case study. `Section 5` provides details about the variables present in the data and provides the steps taken to cleanse the data. Three different types of plots are shown in `Section 6` to compare the distributions of runner age over time: QQ plot, box plot and density plot. In `Section 7` results are presented. `Section 8` concludes the case study.
+`Section 3` gives a background on the race and `Section 4` states the questions that will be answered in this case study. `Section 5` provides details about the variables present in the data and provides the steps taken to cleanse the data. Three different types of plots are shown in `Section 6` to compare the distributions of runner age over time: QQ plot, box plot and density plot. In `Section 7` results are presented.
 
 # Background
 
@@ -306,7 +306,7 @@ Variable types also need to be addressed. `age` is formatted to be numeric and a
 
 Footnotes are removed by looking for `#` and any blank rows are removed.
 
-The cleaned data is compiled into a single dataframe for men and a single dataframe for women. Finally, an inspection of missing values indicates that the `age` variable does have missing values. The analysis that follows is on `age` so this needs to be addressed. The two methods available are to impute the missing ages or to remove those observations. For this case study, any observation with missing `age` is dropped because it is felt that there is a sufficient amount of data where this variable is not missing. There were also a handful of observations where the `age` of the runner was 10 or under. It would be expected that a 0 or 1 year old is not capable of running a race and the `age` for these observations is thought to be incorrect. However, at what age would it be expected that a child could run a 10 mile race? The [Cherry Blossom website](http://www.cherryblossom.org/) indicates that there is a Kid's Run where children between the ages of 4 and 10 may participate. Because of the age range for this race any runner with an `age` 10 or under is dropped from the data for the 10 mile run.
+The cleaned data is compiled into a single dataframe for men and a single dataframe for women. Finally, an inspection of missing values indicates that the `age` variable does have missing values. The analysis that follows is on `age` so this needs to be addressed. The two methods available are to impute the missing ages or to remove those observations. For this case study, any observation with missing `age` is dropped because it is felt that there is a sufficient amount of data where this variable is not missing. There were also a handful of observations where the `age` of the runner was 10 or under. It would be expected that a 0 or 1 year old is not capable of running a race and the `age` for these observations is thought to be incorrect. However, at what age would it be expected that a child could run a 10-mile race? The [Cherry Blossom website](http://www.cherryblossom.org/) indicates that there is a Kid's Run where children between the ages of 4 and 10 may participate. Because of the age range for this race any runner with an `age` 10 or under is dropped from the data for the 10-mile run.
 
 # Plots
 
@@ -336,7 +336,7 @@ plot <- ggplot() +
         axis.line = element_line(colour = "black")) + 
   scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75"))+
   transition_time(year) + 
-  labs(title = "Q-Q Plot of Cherry Blossom Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
+  labs(title = "Figure1: Q-Q Plot of Cherry Blossom Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
 
 my_anim = animate(last_plot(), duration = 40, end_pause = 20, height = 400, width = 600, renderer = gifski_renderer())
 my_anim
@@ -344,12 +344,24 @@ my_anim
 
 ## Boxplot
 
+`Figure 2` is a boxplot of runner age by year. The boxplot displays information about the distribution of age for each year using the five number summary: 
+
+* Mimimum: first quartile - 1.5* Inter-Quartile Range, represented by the end of the line closest to the x-axis
+* First Quartile: 25th percentile, represented by the bottom line of the box
+* Median: the middle value of the dataset, represented by the middle line of the box
+* Third Quartile: 75th percentile, represented by the top line of the box
+* Maximum: third quartile + 1.5 * Inter-Quartile Range, represented by the farthest end of the line from the x-axis
+
+The Inter-Quartile Range (IQR) is a measure of dispersion and measures the difference between the third quartile and first quartile, which contains 50% of the data. Outliers are  also included as dots on the plot. The notches, or indentations, around the median indicate an approximate 95% confidence interval for the median. Overlapping notches, or confidence intervals, signal that the true means may not differ.
+
+When interpreting the boxplot in `Figure 2`, the minimum ages appear very similar throughout the 14-year time period being evaluated. The IQRs are also very similar from year to year, indicating similar variation by year. A symmetric boxplot would indicate a normal distribution. In general, for this dataset the ages for each year appear to be slightly right-skewed, as evidenced by the longer "whiskers" extending upwards from the IQR. Between 1999 and 2003 very little difference is observed in the boxplots. The median decreases from 40 to 39. In 2004 differences in the boxplots appear and change more rapidly. The median and IQR shift down beginning in 2004, indicating an increase in the right-skew of the distributions. The medians also begin to shift lower in the IQR, indicating a more exaggerated peak in the distribution (this will be more clearly illustrated in the density plot in `Figure 3`). In 2009, the median has shifted down to an age of 35. There appears to be some stabilization in the distribution starting in 2009, although the median does shift within the IQR. Finally, it is noted that the approximated 95% confidence intervals do not overlap from 1999 and 2012. Therefore, we are 95% confident that the true medians for 1999 and 2012 are different.
+
 ```{r}
 box_meds <- aggregate(age ~ as.factor(year), men_final, median)
 names(box_meds) <- c("year","age")
 
 ggplot(men_final, aes(x=as.factor(year), y=age, color=as.factor(year))) +
-  geom_boxplot() +
+  geom_boxplot(notch=TRUE) +
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         panel.background = element_blank(),
@@ -358,7 +370,7 @@ ggplot(men_final, aes(x=as.factor(year), y=age, color=as.factor(year))) +
         legend.title = element_blank(),
         axis.line = element_line(colour = "black")) +
   scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75")) + 
-  labs(title = "Age Boxplot of Cherry Blossom Runners (1999 - 2012)") +
+  labs(title = "Figure 2: Age Boxplot of Cherry Blossom Runners (1999 - 2012)") +
   theme(legend.position="none") +
   xlab("") +
   ylab("Age") +
@@ -403,13 +415,12 @@ anim2
 
 ```
 
-
 # Results
 
 How do the distributions change over the years? Was it a gradual change?
 
-# Conclusion
-
 # References 
 
+(http://rdatasciencecases.org/) Case Studies in Data Science with R by Nolan and Lang.
+(http://www.cherryblossom.org/) Cherry Blossom Race website.
 
