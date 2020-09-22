@@ -312,7 +312,7 @@ The cleansed data is compiled into a single dataframe for men and a single dataf
 
 ## Q-Q
 
-We use Q-Q plots to examine whether the age distribution of male runners changed from 1999 to 2012. The animated Q-Q plots below show, year by year, the age distribution of runners versus the theoretical quantiles, assuming a normal distribution of ages. That is, the y-axis represents runner age, while the x-axis is the theoretical quantile based on a normal distribution. Data points near the 0 theoretical quantile are close to the mean age, while points near -2 and 2 quartiles represent extreme low ages and extreme high ages respectively. Q-Q plots that are straight lines with a positive slope at a 45 degree angle, come from relatively normal data, which is evidenced by the density plots in a later section. The QQ plot for 1999 displays a relatively striaght line along the 45 degree angle. A curve in the QQ plot may mean that the data are skewed. A distribution with extreme tails will have a QQ plot that has a flatter slope in the middle with steeper slopes at the extreme ends of the data. 
+We use Q-Q plots to examine whether the age distribution of male runners changed from 1999 to 2012. The animated Q-Q plots in `Figure 1` show, year by year, the age distribution of runners versus the theoretical quantiles, assuming a normal distribution of ages. That is, the y-axis represents runner age, while the x-axis is the theoretical quantile based on a normal distribution. Data points near the 0 theoretical quantile are close to the mean age, while points near -2 and 2 quantiles represent extreme low ages and extreme high ages respectively. Q-Q plots that are straight lines with a positive slope at a 45 degree angle, come from relatively normal data, which is evidenced by the density plots in a later section. The QQ plot for 1999 displays a relatively straight line along the 45 degree angle. A curve in the QQ plot may mean that the data are skewed. A distribution with extreme tails will have a QQ plot that has a flatter slope in the middle with steeper slopes at the extreme ends of the data. 
 
 The animation keeps the 1999 data on the plot for reference, and shows that, as years go by, the Q-Q plot begins to curve and bow downward as the ages of runners decrease. The bowing downward corresponds to a right skewed distribution of ages, also shown in the density plots. Although this downward trend in age appears to occur gradually, the year 2004 appears to be the first large jump downward in age distribution. However, as we'll see in the boxplots and density plots in the following sections, the gradual decrease in median age began occurring as early as 2001.
 
@@ -338,7 +338,7 @@ plot <- ggplot() +
         axis.line = element_line(colour = "black")) + 
   scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75"))+
   transition_time(year) + 
-  labs(title = "Figure1: Q-Q Plot of Cherry Blossom Male Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
+  labs(title = "Figure 1: Q-Q Plot of Cherry Blossom Male Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
 
 my_anim = animate(last_plot(), duration = 40, end_pause = 20, height = 400, width = 600, renderer = gifski_renderer())
 my_anim
@@ -424,7 +424,11 @@ anim2
 
 # Results
 
-The median age of Runners in the Cherry Blossom race decreased between 1999 and 2012. The results from each of our figures show the median age shifting from 40 in 1999 to 35 in 2012. The change starts out gradual but changes more rapidly from 2007 to 2009. There seems to be some stabilization in the last couple of years, but we would need to look at data for more recent years to confirm.  
+The median age of Runners in the Cherry Blossom race decreased between 1999 and 2012. The shifts downward in the median on the boxplots and the density plots show the median age shifting from 40 in 1999 to 35 in 2012. The change starts out gradual but changes more rapidly from 2007 to 2009. There seems to be some stabilization in the median in the last couple of years, but we would need to look at data for more recent years to confirm. 
+
+Not only has the median changed, but the distribution shape of runner ages has also changed. Earlier years have a more normal distribution, as shown in the relatively straight line of the Q-Q plot, the symmetric tails of the boxplot, and the bell-curve shape of the density plot for 1999. However, as the years progressed, the distribution became more noticeably right skewed. More of the runners in the more recent races were younger, as shown in the Q-Q plot bowing downward, the increase in older outliers of the boxplots, and the density plots' right-skewed shapes. 
+
+Due to the graphical evidence of the median and distribution shape of runner ages decreasing, we conclude that the ages of Cherry Blossom male runners have shifted downward and that the shift began gradually but became more rapid from 2007 to 2009.
 
 # References 
 
