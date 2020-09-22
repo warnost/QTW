@@ -338,7 +338,7 @@ plot <- ggplot() +
         axis.line = element_line(colour = "black")) + 
   scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75"))+
   transition_time(year) + 
-  labs(title = "Figure1: Q-Q Plot of Cherry Blossom Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
+  labs(title = "Figure1: Q-Q Plot of Cherry Blossom Male Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
 
 my_anim = animate(last_plot(), duration = 40, end_pause = 20, height = 400, width = 600, renderer = gifski_renderer())
 my_anim
@@ -372,7 +372,7 @@ ggplot(men_final, aes(x=as.factor(year), y=age, color=as.factor(year))) +
         legend.title = element_blank(),
         axis.line = element_line(colour = "black")) +
   scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75")) + 
-  labs(title = "Figure 2: Age Boxplot of Cherry Blossom Runners (1999 - 2012)") +
+  labs(title = "Figure 2: Age Boxplot of Cherry Blossom Male Runners (1999 - 2012)") +
   theme(legend.position="none") +
   xlab("") +
   ylab("Age") +
@@ -412,9 +412,9 @@ anim<-ggplot(plt.data) + geom_density(aes(x=age, fill=as.factor(year))) +
         plot.subtitle = element_text(size=16),
         legend.title = element_blank(),
         axis.line = element_line(colour = "black")) +
-  scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75")) +
+  scale_fill_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75")) +
   transition_time(year) +
-  labs(title = "Figure 3: Age Distribution of Cherry Blossom Runners (1999 - 2012)", subtitle = "Year: {frame_time}")
+  labs(title = "Figure 3: Age Distribution of Cherry Blossom Male Runners (1999 - 2012)", subtitle = "Year: {frame_time}")
 
 ## animate it
 anim2 <- animate(anim, duration = 40, end_pause = 20, height = 400, width = 600)
