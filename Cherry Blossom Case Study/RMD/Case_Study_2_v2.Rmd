@@ -40,7 +40,7 @@ opts_knit$set(width=75)
 
 # Code
 
-The code below gets the Cherry Blossom 10 Mile Race data from the [Cherry Blossom website](http://www.cherryblossom.org/) for 1999-2012 for both men and women runners. The HTML is parsed and the resulting lines of text are output to lists, one for men and one for women. Click the `Code` button to the right to expand the code for this section.
+The code below gets the Cherry Blossom 10 Mile Race data from the [Cherry Blossom website](http://www.cherryblossom.org/) for 1999-2012 for both men and women runners. The HTML is parsed and the resulting lines of text are output to lists: one for men and one for women. Click the `Code` button to the right to expand the code for this section.
 
 ```{r}
 ubase = "http://www.cherryblossom.org/"
@@ -258,21 +258,21 @@ women_final <- cb_Women1[cb_Women1$age > 10,]
 
 # Introduction
 
-Data cleansing can be a very time intensive part of any analytical or statistical project, even if the data is already stored in tables. When data is not already stored in easily readable tables or files, data cleansing can be even more challenging and time consuming to accomplish. Web scraping, where data is pulled from the source of a webpage, is a real-world scenario often encountered when needing to gather data. 
+Data cleansing can be a very time intensive part of any analytical or statistical project, even if the data is already stored in tables. Web scraping, where data is pulled from the source of a webpage, is a real-world scenario often encountered when needing to gather data for a project. The data scraped from a website is typically not stored in easily readable tables or files. This can make data cleansing even more challenging and time consuming to accomplish. 
 
-This case study focuses on Cherry Blossom 10-Mile Race results from 1999 - 2012. The data will be scraped from HTML on the [Cherry Blossom website](http://www.cherryblossom.org/). There is a separate URL for each race year and each gender, totaling 28 different URLs for the 14 years of data. Once the data has been cleansed, a detailed analysis age will be performed to identify how the distribution changes over time.
+This case study focuses on the Cherry Blossom 10 Mile Race result data from 1999 - 2012. The data is scraped from HTML on the [Cherry Blossom website](http://www.cherryblossom.org/). There is a separate URL for each race year and each gender, totaling 28 different URLs for the 14 years of data. Once the data has been cleansed, a detailed analysis on age will be performed to identify how the distribution of age changes over time.
 
-`Section 3` gives a background on the race and `Section 4` states the questions that will be answered in this case study. `Section 5` provides details about the variables present in the data and provides the steps taken to cleanse the data. Three different types of plots are shown in `Section 6` to compare the distributions of runner age over time: QQ plot, box plot and density plot. In `Section 7` results are presented.
+`Section 3` gives a background on the race and `Section 4` states the questions that will be answered in this case study. `Section 5` provides details about the variables present in the data and the steps taken to cleanse the data. Three different types of plots are shown in `Section 6` to compare the distributions of runner age over time: QQ plot, boxplot and density plot. In `Section 7` the results of the analysis on age distribution by year are presented.
 
 # Background
 
-The Cherry Blossom 10 Mile Run is an annual race held in Washington, D.C. The race got its name because it is scheduled to coincide with the cherry blossom tree blooming season. The race started out as a qualifying event for the Boston Marathon, and over the years the race has become extremely popular for runners at all levels. Due to the race's popularity, a lottery system is used to select race entries. The 2021 race will allow for approximately 15,000 runners spread through six different waves of 2,500 runners each.
+The Cherry Blossom 10 Mile Run is an annual race held in Washington, D.C. The race got its name because it is scheduled to coincide with the cherry blossom tree blooming season. The race started out as a qualifying event for the Boston Marathon and over the years has become extremely popular for runners at all levels. Due to the race's popularity, a lottery system is used to select race entries. The 2021 race will allow for approximately 15,000 runners spread through six different waves of 2,500 runners each.
 
 Two other races are held in conjunction with the 10 Mile Run: the 5K Run-Walk and the Kid's Run. The proceeds from the Cherry Blossom races support the Children's Miracle Network Hospitals. 
 
 # Question
 
-We have seen that the 1999 runners were typically older than the 2012 runners. Compare the age distribution of the runners across all 14 years of the races. Use quantile–quantile plots, boxplots, and density curves to make your comparisons. How do the distributions change over the years? Was it a gradual change?  
+Question 10: We have seen that the 1999 runners were typically older than the 2012 runners. Compare the age distribution of the runners across all 14 years of the races. Use quantile–quantile plots, boxplots, and density curves to make your comparisons. How do the distributions change over the years? Was it a gradual change?  
 
 Both male and female data was scraped from the website, but only male data was used for this case study.
 
@@ -280,7 +280,7 @@ Both male and female data was scraped from the website, but only male data was u
 
 ## Dataset
 
-The dataset for this case study is scraped from the [Cherry Blossom website](http://www.cherryblossom.org/). Results are separated by year and gender and the formatting for each dataset is not identical. `Table 1` presents details about the variables that are of interest for this case study. The resulting analysis on age will only use `year` and `age`.
+The dataset for this case study is scraped from the [Cherry Blossom website](http://www.cherryblossom.org/). Results are separated by year and gender. The formatting for each dataset is not identical. `Table 1` presents details about the variables that are of interest for this case study. The analysis in `Section 6` will only use `year` and `age`.
 
 Table 1: Variables of Interest
 
@@ -292,13 +292,13 @@ Table 1: Variables of Interest
 | Age | Age of the runner. |
 | Run Time | Time it takes a runner to complete the race. |
 
-## Dataset Cleanup
+## Dataset Cleansing
 
-Data cleanup is necessary to be able to use the files from the [Cherry Blossom website](http://www.cherryblossom.org/). What follows in this section is a discussion of the data clean-up steps taken. Please note that the majority of this code was taken from the Data Science in R textbook.
+Data cleanup is necessary to be able to use the files from the [Cherry Blossom website](http://www.cherryblossom.org/). What follows in this section is a discussion of the data cleansing steps taken. Please note that the majority of this code was taken from the Data Science in R textbook.
 
-The XML R package is used to scrape the data from the different URLs. Due to an issue with variable separating that occurred when attempting to parse the men's 2009 data, UTF-8 encoding was used to extract the data. For most of the men's years, the text that needs to be extracted is found in `<pre>` nodes inside the HTML in the URL. xmlVALUE is used to extract the text from the `<pre>` node. `\r\n` indicates the end of a line and can be used to split the text pulled from the `<pre>` node into individual lines. There are a few files with exceptions that need to be addressed. First, the 1999 men's file uses a different end of line character: `\n`. Second, the 2000 men's file does not contain well-formed HTML because the HTML elements are not properly nested. Instead of looking in the `<pre>` node for the data, the `<font>` node will be used. Finally, the men's 2009 file presents several problems. It was already noted that there was an issue with separating variables, so the encoding was switched to UTF-8. There is also a different structure to navigate. Instead of obtaining data from the `<pre>` node, the data needs to be extracted from a `<pre>` node found inside `<div[@class='Section1']>`. An IF THEN ELSE statement is used to incorporate these exceptions into the code to scrape the data from the website.
+The XML R package is used to scrape the data from the different URLs. Due to an issue with separating variables that occurred when attempting to parse the men's 2009 data, UTF-8 encoding was used to extract the data. For most of the men's years, the text that needs to be extracted is found in `<pre>` nodes inside the HTML from the URL. xmlVALUE is used to extract the text from the `<pre>` node. `\r\n` indicates the end of a line and can be used to split the text pulled from the `<pre>` node into individual lines. There are a few files with exceptions that need to be addressed. First, the 1999 men's file uses a different end of line character: `\n`. Second, the 2000 men's file does not contain well-formed HTML because the HTML elements are not properly nested. Instead of looking in the `<pre>` node for the data, the `<font>` node will be used. Finally, the men's 2009 file presents several problems. It was already noted that there was an issue with separating variables, so the encoding was switched to UTF-8. There is also a different structure to navigate. Instead of obtaining data from the `<pre>` node, the data needs to be extracted from a `<pre>` node found inside `<div[@class='Section1']>`. An IF THEN ELSE statement is used to incorporate these exceptions into the code to scrape the data from the website.
 
-A list for the men's data and a list for the women's data is the output from the scraping step. The years are separated and at the top of each year's list are several header rows. Most of the years have a row of equal signs that are used to separate the header from the data. This row of equal signs is used to identify the layout of the text. There are spaces found in the row of equal signs to indicate the separation between one variable and another. Columns are separated by looking at the position of these spaces: a column begins one position after a space and ends one position before the subsequent space. A couple of adjustments are made to account for the first variable where the beginning is at the start of the line and to account for any files where the data spills over into the space after the column (in the men's 2003 file `age` ends in the space from the separator row).
+A list for the men's data and a list for the women's data is the output from the scraping step. At the top of each year are several header rows. Most of the years have a row of equal signs that are used to separate the header from the data. This row of equal signs and spaces is used to identify the layout of the text. The spaces found in the row of equal signs indicate the separation between one variable and another. Columns are separated by looking at the position of these spaces: a column begins one position after a space and ends one position before the subsequent space. A couple of adjustments are made to account for the first variable where the beginning is at the start of the line and to account for any files where the data spills over into the space after the column (in the men's 2003 file `age` ends in the space from the separator row).
 
 The code only pulls specific variables that are provided in a list: `name`, `home`, `ag`, `gun`, `net`, and `time`. The variable name is shortened to the minimum characters necessary to uniquely identify it in the text. For example, `home` is used instead of 'hometown' in case different spellings or abbreviations are found. The row that proceeds the separator row of equal signs is searched for these variable names. Font case is addressed in the search as well to ensure that `AG` is recognized as `ag`.
 
@@ -306,15 +306,15 @@ Variable types also need to be addressed. `age` is formatted to be numeric and a
 
 Footnotes are removed by looking for `#` and any blank rows are removed.
 
-The cleaned data is compiled into a single dataframe for men and a single dataframe for women. Finally, an inspection of missing values indicates that the `age` variable does have missing values. The analysis that follows is on `age` so this needs to be addressed. The two methods available are to impute the missing ages or to remove those observations. For this case study, any observation with missing `age` is dropped because it is felt that there is a sufficient amount of data where this variable is not missing. There were also a handful of observations where the `age` of the runner was 10 or under. It would be expected that a 0 or 1 year old is not capable of running a race and the `age` for these observations is thought to be incorrect. However, at what age would it be expected that a child could run a 10-mile race? The [Cherry Blossom website](http://www.cherryblossom.org/) indicates that there is a Kid's Run where children between the ages of 4 and 10 may participate. Because of the age range for this race any runner with an `age` 10 or under is dropped from the data for the 10-mile run.
+The cleansed data is compiled into a single dataframe for men and a single dataframe for women. Finally, an inspection of missing values indicates that the `age` variable does have missing values. The analysis that follows is on `age` so this needs to be addressed. The two methods available are to impute the missing ages or to remove those observations. For this case study, any observation with missing `age` is dropped because it is felt that there is a sufficient amount of data where this variable is not missing. There were also a handful of observations where the `age` of the runner was 10 or under. It would be expected that a 0 or 1 year old is not capable of running a race and the `age` for these observations is thought to be incorrect. However, at what age would it be expected that a child could run a 10 mile race? The [Cherry Blossom website](http://www.cherryblossom.org/) indicates that there is a Kid's Run where children between the ages of 4 and 10 may participate. Because of the age range for Kid's Run, any runner with an `age` 10 or under is dropped from the data for the 10 mile run.
 
 # Plots
 
 ## Q-Q
 
-We use Q-Q plots to examine whether the age distribution of male runners changed from 1999 to 2012. The animated Q-Q plots below show, year by year, the age distribution of runners versus the theoretical quantiles, assuming a normal distribution of ages. That is, the y-axis represents runner age, while the x-axis is the theoretical quartile based on a normal distribution. Data points near the 0 theoretical quartile are close to the mean age, while points near -2 and 2 quartiles represent extreme low ages and extreme high ages respectively. Q-Q plots that are straight lines with a positive slope, like the 1999 data, come from relatively normal data, which is evidenced by the density plots in a later section.
+We use Q-Q plots to examine whether the age distribution of male runners changed from 1999 to 2012. The animated Q-Q plots in `Figure 1` show, year by year, the age distribution of runners versus the theoretical quantiles, assuming a normal distribution of ages. That is, the y-axis represents runner age, while the x-axis is the theoretical quantile based on a normal distribution. Data points near the 0 theoretical quantile are close to the mean age, while points near -2 and 2 quantiles represent extreme low ages and extreme high ages respectively. Q-Q plots that are straight lines with a positive slope at a 45 degree angle, come from relatively normal data, which is evidenced by the density plots in a later section. The QQ plot for 1999 displays a relatively straight line along the 45 degree angle. A curve in the QQ plot may mean that the data are skewed. A distribution with extreme tails will have a QQ plot that has a flatter slope in the middle with steeper slopes at the extreme ends of the data. 
 
-The animation keeps the 1999 data on the plot for reference, and shows that, as years go by, the Q-Q plot bows downward as the ages of runners decrease. The bowing downward corresponds to a right skewed distribution of ages, also shown in the density plots. Although this downward trend in age appears to occur gradually, the year 2004 appears to be the first large jump downward in age distribution. However, as we'll see in the boxplots and density plots in the following sections, the gradual decrease in median age began occurring as early as 2001.
+The animation keeps the 1999 data on the plot for reference, and shows that, as years go by, the Q-Q plot begins to curve and bow downward as the ages of runners decrease. The bowing downward corresponds to a right skewed distribution of ages, also shown in the density plots. Although this downward trend in age appears to occur gradually, the year 2004 appears to be the first large jump downward in age distribution. However, as we'll see in the boxplots and density plots in the following sections, the gradual decrease in median age began occurring as early as 2001.
 
 ```{r}
 ## reduce to complete cases
@@ -338,7 +338,7 @@ plot <- ggplot() +
         axis.line = element_line(colour = "black")) + 
   scale_color_manual(values=c("#3d3c4c","#a19d9c","#d23b42","#eaac9d","#ff823f","#ffaf15","#34558b","#798ea9","#107895","#4ec5a7","#575c46","#71617c","#a2543d","#b59e75"))+
   transition_time(year) + 
-  labs(title = "Figure1: Q-Q Plot of Cherry Blossom Male Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
+  labs(title = "Figure 1: Q-Q Plot of Cherry Blossom Male Runners (as compared to 1999)", subtitle = "Year: {frame_time}")
 
 my_anim = animate(last_plot(), duration = 40, end_pause = 20, height = 400, width = 600, renderer = gifski_renderer())
 my_anim
@@ -356,7 +356,7 @@ my_anim
 
 The Inter-Quartile Range (IQR) is a measure of dispersion and measures the difference between the third quartile and first quartile, which contains 50% of the data. Outliers are  also included as dots on the plot. The notches, or indentations, around the median indicate an approximate 95% confidence interval for the median. Overlapping notches, or confidence intervals, signal that the true means may not differ.
 
-When interpreting the boxplot in `Figure 2`, the minimum ages appear very similar throughout the 14-year time period being evaluated. The IQRs are also very similar from year to year, indicating similar variation by year. A symmetric boxplot would indicate a normal distribution. In general, for this dataset the ages for each year appear to be slightly right-skewed, as evidenced by the longer "whiskers" extending upwards from the IQR. Between 1999 and 2003 very little difference is observed in the boxplots. The median decreases from 40 to 39. In 2004 differences in the boxplots appear and change more rapidly. The median and IQR shift down beginning in 2004, indicating an increase in the right-skew of the distributions. The medians also begin to shift lower in the IQR, indicating a more exaggerated peak in the distribution (this will be more clearly illustrated in the density plot in `Figure 3`). In 2009, the median has shifted down to an age of 35. There appears to be some stabilization in the distribution starting in 2009, although the median does shift within the IQR. Finally, it is noted that the approximated 95% confidence intervals do not overlap from 1999 and 2012. Therefore, we are 95% confident that the true medians for 1999 and 2012 are different.
+When interpreting the boxplot in `Figure 2`, the minimum ages appear very similar throughout the 14-year time period being evaluated. The IQRs are also very similar from year to year, indicating similar variation by year. A symmetric boxplot would indicate a normal distribution. In general, for this dataset the ages for each year appear to be slightly right-skewed, as evidenced by the longer "whiskers" extending upwards from the IQR. Between 1999 and 2003 very little difference is observed in the boxplots. The median decreases from 40 to 39 during this period. In 2004, differences in the boxplots appear and change more rapidly. The median and IQR shift down beginning in 2004, indicating an increase in the right-skew of the distributions. The medians also begin to shift lower in the IQR, indicating a more exaggerated peak in the distribution (this will be more clearly illustrated in the density plot in `Figure 3`). In 2009, the median has shifted down to an age of 35. There appears to be some stabilization in the distribution starting in 2009, although the median does shift within the IQR. Finally, it is noted that the approximated 95% confidence intervals for 1999 and 2012 do not overlap. Therefore, we are 95% confident that the true medians for 1999 and 2012 are different.
 
 ```{r}
 box_meds <- aggregate(age ~ as.factor(year), men_final, median)
@@ -384,9 +384,9 @@ ggplot(men_final, aes(x=as.factor(year), y=age, color=as.factor(year))) +
 
 ## Density
 
-`Figure 3` is a density chart, a smoothed version of the histogram, which helps us understand how many runners there are at each age. The more runners there are for a certain age, the higher the curve will be at that point. It can also help us understand if the distribution is skewed. The normal distribution would have a peak at the mean/median and be symmetrical, where a skewed distribution would have a long tail on one side. 
+`Figure 3` is a density plot, a smoothed version of the histogram, which helps us understand how many runners there are at each age. The more runners there are for a certain age, the higher the curve will be at that point. It can also help us understand if the distribution is skewed. The normal distribution would have a peak at the mean/median and be symmetrical, where a skewed distribution would have a long tail on one side. 
 
-Looking at the density for 1999, it is not quite symmetrical but its peak is near the median age of 40. As the years pass, the age distribution becomes increasingly right skewed, indicating an increase in younger runners. You can see the median age decrease to 35 by 2012, with the peak moving to the left of the median. There is not much shift from 2011 to 2012, it is possible that the distribution of age might be stabilizing, but we would need to confirm with more data.  
+Looking at the density plot for 1999 (the reference in the animated plot in `Figure 3`), it is not quite symmetrical but its peak is near the median age of 40. As the years pass, the age distribution becomes increasingly right skewed, indicating an increase in younger runners. You can see the median age decrease to 35 by 2012, with the peak moving to the left of the median. There is not much shift from 2011 to 2012. It is possible that the distribution of age might be stabilizing, but we would need to confirm with more data.  
 
 ```{r}
 plt.data <- men_final
@@ -424,7 +424,11 @@ anim2
 
 # Results
 
-The median age of Runners in the Cherry Blossom race has been going down between 1999 and 2012. The results from each of our figures show the median age shifting from 40 in 1999 to 35 in 2012. The change starts out gradual but changes more rapidly from 2007 to 2009. There seems to be some stabilization in the last couple of years but we would need to look at additional data to confirm.  
+The median age of Runners in the Cherry Blossom race decreased between 1999 and 2012. The shifts downward in the median on the boxplots and the density plots show the median age shifting from 40 in 1999 to 35 in 2012. The change starts out gradual but changes more rapidly from 2007 to 2009. There seems to be some stabilization in the median in the last couple of years, but we would need to look at data for more recent years to confirm. 
+
+Not only has the median changed, but the distribution shape of runner ages has also changed. Earlier years have a more normal distribution, as shown in the relatively straight line of the Q-Q plot, the symmetric tails of the boxplot, and the bell-curve shape of the density plot for 1999. However, as the years progressed, the distribution became more noticeably right skewed. More of the runners in the more recent races were younger, as shown in the Q-Q plot bowing downward, the increase in older outliers of the boxplots, and the density plots' right-skewed shapes. 
+
+Due to the graphical evidence of the median and distribution shape of runner ages decreasing, we conclude that the ages of Cherry Blossom male runners have shifted downward and that the shift began gradually but became more rapid from 2007 to 2009.
 
 # References 
 
