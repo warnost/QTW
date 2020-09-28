@@ -128,6 +128,12 @@ processAllEmail = function(dirName, isSpam = FALSE) {
   
   invisible(emailList)
 }
+
+getBoundary = function(header) {
+  boundaryIdx = grep("boundary=", header)
+  boundary = gsub('"', "", header[boundaryIdx])
+  gsub(".*boundary= *([^;]*);?.*", "\\1", boundary)
+}
 ```
 
 ```{r}

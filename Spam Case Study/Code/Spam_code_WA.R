@@ -1099,7 +1099,7 @@ emailDF = createDerivedDF(emailStruct)
 dim(emailDF)
 save(emailDF, file = "../Data/spamAssassinDerivedDF.rda")
 
-load("Data/spamAssassinDerivedDF.rda")
+load("../Data/spamAssassinDerivedDF.rda")
 dim(emailDF)
 
 perCaps2 =
