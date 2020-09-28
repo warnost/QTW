@@ -1,0 +1,149 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+processHeader = function(header) {
+       # modify the first line to create a key:value pair
+  header[1] = sub("^From", "Top-From:", header[1])
+  
+  headerMat = read.dcf(textConnection(header), all = TRUE)
+  headerVec = unlist(headerMat)
+  
+  dupKeys = sapply(headerMat, function(x) length(unlist(x)))
+  names(headerVec) = rep(colnames(headerMat), dupKeys)
+  
+  return(headerVec)
+}
+
+splitMessage = function(msg) {
+  splitPoint = match("", msg)
+  header = msg[1:(splitPoint-1)]
+  body = msg[ -(1:splitPoint) ]
+  return(list(header = header, body = body))
+}
+
+processAttach = function(body, contentType){
+
+  n = length(body)
+  boundary = getBoundary(contentType)
+ 
+  bString = paste("--", boundary, sep = "")
+  bStringLocs = which(bString == body)
+  eString = paste("--", boundary, "--", sep = "")
+  eStringLoc = which(eString == body)
+  
+  if (length(eStringLoc) == 0) eStringLoc = n
+  if (length(bStringLocs) <= 1) {
+    attachLocs = NULL
+    msgLastLine = n
+    if (length(bStringLocs) == 0) bStringLocs = 0
+  } else {
+    attachLocs = c(bStringLocs[ -1 ],  eStringLoc)
+    msgLastLine = bStringLocs[2] - 1
+  }
+  
+  msg = body[ (bStringLocs[1] + 1) : msgLastLine] 
+  if ( eStringLoc < n )
+    msg = c(msg, body[ (eStringLoc + 1) : n ])
+  
+  if ( !is.null(attachLocs) ) {
+    attachLens = diff(attachLocs, lag = 1) 
+    attachTypes = mapply(function(begL, endL) {
+      CTloc = grep("^[Cc]ontent-[Tt]ype", body[ (begL + 1) : (endL - 1)])
+      if ( length(CTloc) == 0 ) {
+        MIMEType = NA
+      } else {
+        CTval = body[ begL + CTloc[1] ]
+        CTval = gsub('"', "", CTval )
+        MIMEType = sub(" *[Cc]ontent-[Tt]ype: *([^;]*);?.*", "\\1", CTval)   
+      }
+      return(MIMEType)
+    }, attachLocs[-length(attachLocs)], attachLocs[-1])
+  }
+  
+  if (is.null(attachLocs)) return(list(body = msg, attachDF = NULL) )
+  return(list(body = msg, 
+             attachDF = data.frame(aLen = attachLens, 
+                                     aType = unlist(attachTypes),
+                                     stringsAsFactors = FALSE)))                                
+}                       
+
+readEmail = function(dirName) {
+       # retrieve the names of files in directory
+  fileNames = list.files(dirName, full.names = TRUE)
+       # drop files that are not email
+  notEmail = grep("cmds$", fileNames)
+  if ( length(notEmail) > 0) fileNames = fileNames[ - notEmail ]
+
+       # read all files in the directory
+  lapply(fileNames, readLines, encoding = "latin1")
+}
+
+processAllEmail = function(dirName, isSpam = FALSE) {
+       # read all files in the directory
+  messages = readEmail(dirName)
+  fileNames = names(messages)
+  n = length(messages)
+  
+       # split header from body
+  eSplit = lapply(messages, splitMessage)
+  rm(messages)
+
+       # process header as named character vector
+  headerList = lapply(eSplit, function(msg) 
+                                 processHeader(msg$header))
+  
+       # extract content-type key
+  contentTypes = sapply(headerList, function(header) 
+                                       header["Content-Type"])
+  
+       # extract the body
+  bodyList = lapply(eSplit, function(msg) msg$body)
+  rm(eSplit)
+
+       # which email have attachments
+  hasAttach = grep("^ *multi", tolower(contentTypes))
+
+       # get summary stats for attachments and the shorter body
+  attList = mapply(processAttach, bodyList[hasAttach], 
+                   contentTypes[hasAttach], SIMPLIFY = FALSE)
+  
+  bodyList[hasAttach] = lapply(attList, function(attEl) 
+                                           attEl$body)
+ 
+  attachInfo = vector("list", length = n )
+  attachInfo[ hasAttach ] = lapply(attList, 
+                                  function(attEl) attEl$attachDF)
+ 
+       # prepare return structure
+  emailList = mapply(function(header, body, attach, isSpam) {
+                       list(isSpam = isSpam, header = header, 
+                            body = body, attach = attach)
+                     },
+                     headerList, bodyList, attachInfo, 
+                     rep(isSpam, n), SIMPLIFY = FALSE )
+  names(emailList) = fileNames
+  
+  invisible(emailList)
+}
+```
+
+```{r}
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+spamPath = "../Data"
+
+dirNames = list.files(path = paste(spamPath, "messages", sep = .Platform$file.sep))
+
+fullDirNames = paste(spamPath, "messages", dirNames, sep = .Platform$file.sep)
+```
+
+
+
+```{r}
+emailStruct = mapply(processAllEmail, fullDirNames,
+                     isSpam = rep( c(FALSE, TRUE), 3:2))      
+emailStruct = unlist(emailStruct, recursive = FALSE)
+```
+
