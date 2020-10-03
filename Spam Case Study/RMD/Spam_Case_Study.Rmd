@@ -25,6 +25,7 @@ library(gganimate)
 library(gifski)
 library(transformr)
 library(rcartocolor)
+library(tm)
 
 ## Global options
 options(max.print="75")
@@ -40,13 +41,632 @@ opts_knit$set(width=75)
 
 # Code
 
+Use the bottom to the right to expand the code for reading in the emails and creating the dataset that will be used to model off of.
 
+```{r}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+# set directory path
+spamPath = "../Data"
+
+# get the directory names
+dirNames = list.files(path = paste(spamPath, "messages", sep = .Platform$file.sep))
+
+# create a list of all spam email file names
+fullDirNames = paste(spamPath, "messages", dirNames, sep = .Platform$file.sep)
+fileNames = list.files(fullDirNames[1], full.names = TRUE)
+
+# split the message into header/body based on the first blank row in the email
+splitMessage = function(msg) {
+  # look for the first blank line
+  splitPoint = match("", msg)
+  # header are rows before the first blank line
+  header = msg[1:(splitPoint-1)]
+  # body are rows after the first blank line
+  body = msg[ -(1:splitPoint) ]
+  return(list(header = header, body = body))
+}
+
+# get boundary positions for attachment
+getBoundary = function(header) {
+  boundaryIdx = grep("boundary=", header)
+  boundary = gsub('"', "", header[boundaryIdx])
+  gsub(".*boundary= *([^;]*);?.*", "\\1", boundary)
+}
+
+# process the header into usable arguments
+processHeader = function(header) {
+  # modify the first line to create a key:value pair
+  header[1] = sub("^From", "Top-From:", header[1])
+  
+  # reads data in the format key: value and accounts for continuation on subsequent lines
+  headerMat = read.dcf(textConnection(header), all = TRUE)
+  # convert to character vector with key as the name for each value
+  headerVec = unlist(headerMat)
+  
+  dupKeys = sapply(headerMat, function(x) length(unlist(x)))
+  names(headerVec) = rep(colnames(headerMat), dupKeys)
+  
+  return(headerVec)
+  }
+
+# process the attachment
+processAttach = function(body, contentType){
+  
+  n = length(body)
+  boundary = getBoundary(contentType)
+  
+  bString = paste("--", boundary, sep = "")
+  bStringLocs = which(bString == body)
+  eString = paste("--", boundary, "--", sep = "")
+  eStringLoc = which(eString == body)
+  
+  if (length(eStringLoc) == 0) eStringLoc = n
+  if (length(bStringLocs) <= 1) {
+    attachLocs = NULL
+    msgLastLine = n
+    if (length(bStringLocs) == 0) bStringLocs = 0
+  } else {
+    attachLocs = c(bStringLocs[ -1 ],  eStringLoc)
+    msgLastLine = bStringLocs[2] - 1
+  }
+  
+  msg = body[ (bStringLocs[1] + 1) : msgLastLine] 
+  if ( eStringLoc < n )
+    msg = c(msg, body[ (eStringLoc + 1) : n ])
+  
+  if ( !is.null(attachLocs) ) {
+    attachLens = diff(attachLocs, lag = 1) 
+    attachTypes = mapply(function(begL, endL) {
+      CTloc = grep("^[Cc]ontent-[Tt]ype", body[ (begL + 1) : (endL - 1)])
+      if ( length(CTloc) == 0 ) {
+        MIMEType = NA
+      } else {
+        CTval = body[ begL + CTloc[1] ]
+        CTval = gsub('"', "", CTval )
+        MIMEType = sub(" *[Cc]ontent-[Tt]ype: *([^;]*);?.*", "\\1", CTval)   
+      }
+      return(MIMEType)
+    }, attachLocs[-length(attachLocs)], attachLocs[-1])
+  }
+  
+  if (is.null(attachLocs)) return(list(body = msg, attachDF = NULL) )
+  return(list(body = msg, 
+              attachDF = data.frame(aLen = attachLens, 
+                                    aType = unlist(attachTypes),
+                                    stringsAsFactors = FALSE)))   
+  
+  }                       
+
+readEmail = function(dirName) {
+  # retrieve the names of files in directory
+  fileNames = list.files(dirName, full.names = TRUE)
+  # drop files that are not email
+  notEmail = grep("cmds$", fileNames)
+  if ( length(notEmail) > 0) fileNames = fileNames[ - notEmail ]
+  
+  # read all files in the directory
+  lapply(fileNames, readLines, encoding = "latin1")
+}
+
+
+# process all emails, including headers and attachments
+processAllEmail = function(dirName, isSpam = FALSE)
+{
+  # read all files in the directory
+  messages = readEmail(dirName)
+  fileNames = names(messages)
+  n = length(messages)
+  
+  # split header from body
+  eSplit = lapply(messages, splitMessage)
+  rm(messages)
+  
+  # process header as named character vector
+  headerList = lapply(eSplit, function(msg) 
+    processHeader(msg$header))
+  
+  # extract content-type key
+  contentTypes = sapply(headerList, function(header) 
+    header["Content-Type"])
+  
+  # extract the body
+  bodyList = lapply(eSplit, function(msg) msg$body)
+  rm(eSplit)
+  
+  # which email have attachments
+  hasAttach = grep("^ *multi", tolower(contentTypes))
+  
+  # get summary stats for attachments and the shorter body
+  attList = mapply(processAttach, bodyList[hasAttach], 
+                   contentTypes[hasAttach], SIMPLIFY = FALSE)
+  
+  bodyList[hasAttach] = lapply(attList, function(attEl) 
+    attEl$body)
+  
+  attachInfo = vector("list", length = n )
+  attachInfo[ hasAttach ] = lapply(attList, 
+                                   function(attEl) attEl$attachDF)
+  
+  # prepare return structure
+  emailList = mapply(function(header, body, attach, isSpam) {
+    list(isSpam = isSpam, header = header, 
+         body = body, attach = attach)
+  },
+  headerList, bodyList, attachInfo, 
+  rep(isSpam, n), SIMPLIFY = FALSE )
+  names(emailList) = fileNames
+  
+  invisible(emailList)
+}
+
+# apply the over-arching function to all emails
+emailStruct = mapply(processAllEmail, fullDirNames, isSpam = rep( c(FALSE, TRUE), 3:2))      
+emailStruct = unlist(emailStruct, recursive = FALSE)
+
+# save the processed email file
+save(emailStruct, file="emailXX.rda")
+
+# create a derived function that allows the code to remain virtually unchanged when adding/removing functions
+createDerivedDF = function(email = emailStruct, operations = funcList, verbose = FALSE) {
+  els = lapply(names(operations), function(id) {
+    if(verbose) print(id)
+    e = operations[[id]]
+    v = if(is.function(e)) 
+      sapply(email, e)
+    else 
+      sapply(email, function(msg) eval(e))
+    v
+    })
+    
+  df = as.data.frame(els)
+  names(df) = names(operations)
+  invisible(df)
+  }
+
+# create list of functions that can be applied to emails
+funcList = list(
+  isSpam =
+    expression(msg$isSpam)
+  ,
+  
+  # is the message a response from an earlier message
+  isRe =
+    function(msg) {
+      # Can have a Fwd: Re:  ... but we are not looking for this here.
+      # We may want to look at In-Reply-To field.
+      "Subject" %in% names(msg$header) && 
+        length(grep("^[ \t]*Re:", msg$header[["Subject"]])) > 0
+    }
+  ,
+  numLines =
+    function(msg) length(msg$body)
+  ,
+  bodyCharCt =
+    function(msg)
+      sum(nchar(msg$body))
+  ,
+  underscore =
+    function(msg) {
+      if(!"Reply-To" %in% names(msg$header))
+        return(FALSE)
+      
+      txt <- msg$header[["Reply-To"]]
+      length(grep("_", txt)) > 0  && 
+        length(grep("[0-9A-Za-z]+", txt)) > 0
+    }
+  ,
+  subExcCt = 
+    function(msg) {
+      x = msg$header["Subject"]
+      if(length(x) == 0 || sum(nchar(x)) == 0 || is.na(x))
+        return(NA)
+      
+      sum(nchar(gsub("[^!]","", x)))
+    }
+  ,
+  subQuesCt =
+    function(msg) {
+      x = msg$header["Subject"]
+      if(length(x) == 0 || sum(nchar(x)) == 0 || is.na(x))
+        return(NA)
+      
+      sum(nchar(gsub("[^?]","", x)))
+    }
+  ,
+  numAtt = 
+    function(msg) {
+      if (is.null(msg$attach)) return(0)
+      else nrow(msg$attach)
+    }
+  
+  ,
+  priority =
+    function(msg) {
+      ans <- FALSE
+      # Look for names X-Priority, Priority, X-Msmail-Priority
+      # Look for high any where in the value
+      ind = grep("priority", tolower(names(msg$header)))
+      if (length(ind) > 0)  {
+        ans <- length(grep("high", tolower(msg$header[ind]))) >0
+      }
+      ans
+    }
+  ,
+  numRec =
+    function(msg) {
+      # unique or not.
+      els = getMessageRecipients(msg$header)
+      
+      if(length(els) == 0)
+        return(NA)
+      
+      # Split each line by ","  and in each of these elements, look for
+      # the @ sign. This handles
+      tmp = sapply(strsplit(els, ","), function(x) grep("@", x))
+      sum(sapply(tmp, length))
+    }
+  ,
+  perCaps =
+    function(msg)
+    {
+      body = paste(msg$body, collapse = "")
+      
+      # Return NA if the body of the message is "empty"
+      if(length(body) == 0 || nchar(body) == 0) return(NA)
+      
+      # Eliminate non-alpha characters and empty lines 
+      body = gsub("[^[:alpha:]]", "", body)
+      els = unlist(strsplit(body, ""))
+      ctCap = sum(els %in% LETTERS)
+      100 * ctCap / length(els)
+    }
+  ,
+  isInReplyTo =
+    function(msg)
+    {
+      "In-Reply-To" %in% names(msg$header)
+    }
+  ,
+  sortedRec =
+    function(msg)
+    {
+      ids = getMessageRecipients(msg$header)
+      all(sort(ids) == ids)
+    }
+  ,
+  subPunc =
+    function(msg)
+    {
+      if("Subject" %in% names(msg$header)) {
+        el = gsub("['/.:@-]", "", msg$header["Subject"])
+        length(grep("[A-Za-z][[:punct:]]+[A-Za-z]", el)) > 0
+      }
+      else
+        FALSE
+    },
+  hour =
+    function(msg)
+    {
+      date = msg$header["Date"]
+      if ( is.null(date) ) return(NA)
+      # Need to handle that there may be only one digit in the hour
+      locate = regexpr("[0-2]?[0-9]:[0-5][0-9]:[0-5][0-9]", date)
+      
+      if (locate < 0)
+        locate = regexpr("[0-2]?[0-9]:[0-5][0-9]", date)
+      if (locate < 0) return(NA)
+      
+      hour = substring(date, locate, locate+1)
+      hour = as.numeric(gsub(":", "", hour))
+      
+      locate = regexpr("PM", date)
+      if (locate > 0) hour = hour + 12
+      
+      locate = regexpr("[+-][0-2][0-9]00", date)
+      if (locate < 0) offset = 0
+      else offset = as.numeric(substring(date, locate, locate + 2))
+      (hour - offset) %% 24
+    }
+  ,
+  multipartText =
+    function(msg)
+    {
+      if (is.null(msg$attach)) return(FALSE)
+      numAtt = nrow(msg$attach)
+      
+      types = 
+        length(grep("(html|plain|text)", msg$attach$aType)) > (numAtt/2)
+    }
+  ,
+  hasImages =
+    function(msg)
+    {
+      if (is.null(msg$attach)) return(FALSE)
+      
+      length(grep("^ *image", tolower(msg$attach$aType))) > 0
+    }
+  ,
+  isPGPsigned =
+    function(msg)
+    {
+      if (is.null(msg$attach)) return(FALSE)
+      
+      length(grep("pgp", tolower(msg$attach$aType))) > 0
+    },
+  perHTML =
+    function(msg)
+    {
+      if(! ("Content-Type" %in% names(msg$header))) return(0)
+      
+      el = tolower(msg$header["Content-Type"]) 
+      if (length(grep("html", el)) == 0) return(0)
+      
+      els = gsub("[[:space:]]", "", msg$body)
+      totchar = sum(nchar(els))
+      totplain = sum(nchar(gsub("<[^<]+>", "", els )))
+      100 * (totchar - totplain)/totchar
+    },
+  subSpamWords =
+    function(msg)
+    {
+      if("Subject" %in% names(msg$header))
+        length(grep(paste(SpamCheckWords, collapse = "|"), 
+                    tolower(msg$header["Subject"]))) > 0
+      else
+        NA
+    }
+  ,
+  subBlanks =
+    function(msg)
+    {
+      if("Subject" %in% names(msg$header)) {
+        x = msg$header["Subject"]
+        # should we count blank subject line as 0 or 1 or NA?
+        if (nchar(x) == 1) return(0)
+        else 100 *(1 - (nchar(gsub("[[:blank:]]", "", x))/nchar(x)))
+      } else NA
+    }
+  ,
+  noHost =
+    function(msg)
+    {
+      # Or use partial matching.
+      idx = pmatch("Message-", names(msg$header))
+      
+      if(is.na(idx)) return(NA)
+      
+      tmp = msg$header[idx]
+      return(length(grep(".*@[^[:space:]]+", tmp)) ==  0)
+    }
+  ,
+  numEnd =
+    function(msg)
+    {
+      # If we just do a grep("[0-9]@",  )
+      # we get matches on messages that have a From something like
+      # " \"marty66@aol.com\" <synjan@ecis.com>"
+      # and the marty66 is the "user's name" not the login
+      # So we can be more precise if we want.
+      x = names(msg$header)
+      if ( !( "From" %in% x) ) return(NA)
+      login = gsub("^.*<", "", msg$header["From"])
+      if ( is.null(login) ) 
+        login = gsub("^.*<", "", msg$header["X-From"])
+      if ( is.null(login) ) return(NA)
+      login = strsplit(login, "@")[[1]][1]
+      length(grep("[0-9]+$", login)) > 0
+    },
+  
+  # identifies if all alpha characters in the subject line are upper case
+  isYelling =
+    function(msg)
+    {
+      if ( "Subject" %in% names(msg$header) ) {
+        el = gsub("[^[:alpha:]]", "", msg$header["Subject"])
+        if (nchar(el) > 0) nchar(gsub("[A-Z]", "", el)) < 1
+        else FALSE
+      }
+      else
+        NA
+    },
+  forwards =
+    function(msg)
+    {
+      x = msg$body
+      if(length(x) == 0 || sum(nchar(x)) == 0)
+        return(NA)
+      
+      ans = length(grep("^[[:space:]]*>", x))
+      100 * ans / length(x)
+    },
+  isOrigMsg =
+    function(msg)
+    {
+      x = msg$body
+      if(length(x) == 0) return(NA)
+      
+      length(grep("^[^[:alpha:]]*original[^[:alpha:]]+message[^[:alpha:]]*$", 
+                  tolower(x) ) ) > 0
+    },
+  isDear =
+    function(msg)
+    {
+      x = msg$body
+      if(length(x) == 0) return(NA)
+      
+      length(grep("^[[:blank:]]*dear +(sir|madam)\\>", 
+                  tolower(x))) > 0
+    },
+  isWrote =
+    function(msg)
+    {
+      x = msg$body
+      if(length(x) == 0) return(NA)
+      
+      length(grep("(wrote|schrieb|ecrit|escribe):", tolower(x) )) > 0
+    },
+  avgWordLen =
+    function(msg)
+    {
+      txt = paste(msg$body, collapse = " ")
+      if(length(txt) == 0 || sum(nchar(txt)) == 0) return(0)
+      
+      txt = gsub("[^[:alpha:]]", " ", txt)
+      words = unlist(strsplit(txt, "[[:blank:]]+"))
+      wordLens = nchar(words)
+      mean(wordLens[ wordLens > 0 ])
+    }
+  ,
+  numDlr =
+    function(msg)
+    {
+      x = paste(msg$body, collapse = "")
+      if(length(x) == 0 || sum(nchar(x)) == 0)
+        return(NA)
+      
+      nchar(gsub("[^$]","", x))
+    }
+)
+
+# spam words
+SpamCheckWords = c("viagra", "pounds", "free", "weight", "guarantee", "million", "dollars", "credit", "risk", "prescription", "generic", "drug",
+                   "financial", "save", "dollar", "erotic", "million", "barrister", "beneficiary", "easy", "money back", "money", "credit card")
+
+
+getMessageRecipients = function(header) {
+  c(if("To" %in% names(header))  header[["To"]] else character(0),
+    if("Cc" %in% names(header))  header[["Cc"]] else character(0),
+    if("Bcc" %in% names(header)) header[["Bcc"]] else character(0)
+    )
+  }
+
+# add in additional derived variables
+emailDF = createDerivedDF(emailStruct)
+```
+
+Use the bottom to the right to expand the code for recursive partitioning using caret with method=rpart from R.
+
+```{r}
+### recursive partitioning ###
+library(rpart)
+library(caret)
+
+# Ok so first of all our data is in T/F 'factors'.  
+# We need to change it to numbers.  And as it turns out, there are quite a few NANs as well.  Let's set those to zero.
+setupRnum = function(data) {
+  logicalVars = which(sapply(data, is.logical))
+  facVars = lapply(data[ , logicalVars], function(x) {
+    x = as.numeric(x)
+    })
+  cbind(facVars, data[ , - logicalVars])
+  }
+
+emailDFnum = setupRnum(emailDF)
+
+emailDFnum[is.na(emailDFnum)]<-0
+
+
+# Because our authors prefer Type I/II errors, but the cool kids know that precision/recall/F1 is where its at, while the default of caret is accuracy and kappa.  
+# To get us all on the same page, I create a function that returns the metrics we want.  
+# However, rather than re-invent the wheel, I just install a package.  I am not sure if it had Type I/II errors so those I made my self.
+
+library(MLmetrics)
+f1 <- function(data, lev = NULL, model = NULL) {
+  f1_val <- F1_Score(y_pred = data$pred, y_true = data$obs, positive = lev[1])
+  p <- Precision(y_pred = data$pred, y_true = data$obs, positive = lev[1])
+  r <- Recall(y_pred = data$pred, y_true = data$obs, positive = lev[1])
+  fp <-sum(data$pred==0 & data$obs==1)/length(data$pred)  
+  
+  fn <-sum(data$pred==1 & data$obs==0)/length(data$pred)
+  c(F1 = f1_val,
+    prec = p,
+    rec = r,
+    Type_I_err=fp,
+    Type_II_err=fn)
+  }
+
+library(naivebayes)
+library(e1071)
+library(rpart)
+
+### rpart with defaults ###
+train_control<-trainControl(method="cv", number =5, savePredictions = 'final',summaryFunction = f1)
+set.seed(1234)
+model_rpart_defaults<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart', na.action = na.omit)
+
+library(rattle)
+#fancyRpartPlot(model_rpart_defaults$finalModel)
+
+### rpart with parameter tuning###
+# create dataset to hold the results
+results_combined <- data.frame(minsplit=double(),
+                               maxdepth=double(),
+                               cp=double(),
+                               F1=double(),
+                               prec=double(),
+                               rec=double(),
+                               Type_I_err=double(),
+                               Type_II_err=double(),
+                               stringsAsFactors = FALSE)
+
+# create the dataset used to loop through different values of minsplit and maxdepth
+control_grid <- expand.grid(minsplit=seq(5,25,1),
+                            maxdepth=seq(15,30,1))
+
+# create the grid used inside caret::train to grid search on cp
+cart_grid<-expand.grid(cp = seq(from = 0, to=0.01, by=0.0005))
+
+# train function for 5-fold cross validation
+train_control<-trainControl(method="cv", number =5, savePredictions = 'final',summaryFunction = f1)
+
+# loop to tune cp, minsplit and maxdepth
+for(i in 1:nrow(control_grid)) {
+  set.seed(1234)
+  model_rpart<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart',
+                            control=rpart.control(minsplit=control_grid$minsplit[i],
+                                                  maxdepth=control_grid$maxdepth[i]
+                                                  ),
+                            tuneGrid = cart_grid, na.action = na.omit)
+
+  #identify which cp parameter for the loop was the best
+  results=as.data.frame(model_rpart$results)
+  results1=results[which(results$F1==max(results$F1)),]
+  
+  #insert the loop values into the main dataframe
+  results_combined[i,"minsplit"] = control_grid$minsplit[i]
+  results_combined[i,"maxdepth"] = control_grid$maxdepth[i]
+  results_combined[i,"cp"] = results1$cp
+  results_combined[i,"F1"] = results1$F1
+  results_combined[i,"prec"] = results1$prec
+  results_combined[i,"rec"] = results1$rec
+  results_combined[i,"Type_I_err"] = results1$Type_I_err
+  results_combined[i,"Type_II_err"] = results1$Type_II_err
+}
+
+#identify the winning model's parameters
+results_tuned = results_combined[which(results_combined$F1==max(results_combined$F1)),]
+
+#rerun the model with the winning parameters to enable tree plotting
+set.seed(1234)
+model_rpart_tuned<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart',
+                            control=rpart.control(minsplit=5,
+                                                  maxdepth=29,
+                                                  cp=0
+                                                  ),
+                            na.action = na.omit)
+
+model_rpart_tuned
+#plot(model_rpart)
+
+#fancyRpartPlot(model_rpart$finalModel)
+```
 
 # Introduction
 
-  Many machine learning packages come with convenient features, including useful default parameters for many algorithms. While the default parameters are often good, they can be tailored to the specific problem being analyzed. In this case study, we will optimize the rpart decision tree algorithm to classify Spam messages from the SpamAssassin corpus. We will perform a grid search across multiple parameters to minimize the error on our dataset. We will also show visualizations to show how our model metrics improve over different values of these parameters.  
+Many machine learning packages come with convenient features, including useful default parameters for many algorithms. While the default parameters are often good, they can be tailored to the specific problem being analyzed. In this case study, we will optimize the rpart decision tree algorithm to classify Spam messages from the SpamAssassin corpus. We will perform a grid search across multiple parameters to minimize the error on our dataset. We will also show visualizations to show how our model metrics improve over different values of these parameters.  
 
-We sourced the data from the case study website (http://rdatasciencecases.org/), but the corpus is also available at the SpamAssassin website here (https://spamassassin.apache.org/downloads.cgi?update=202001292230) 
+We sourced the data from the [Data Science in R website](http://rdatasciencecases.org/), but the corpus is also available at the [SpamAssassin website](https://spamassassin.apache.org/downloads.cgi?update=202001292230) 
 
 # Question
 
@@ -56,7 +676,7 @@ Question 19: Consider the other parameters that can be used to control the recur
 
 ## Dataset
 
-For this problem, we will be using the Spam Assassin Corpus which provides emails that can be used to train spam filters. A spam filter tries to judge whether or not an email is spam based on the contents and characteristics of an email. This corpus contains over nine thousand emails, pre-identified as spam or not-spam. There are five directories of messages including 3 folders for not spam and 2 for spam. Each folder contains full email messages including their header, body, and attachments. The header contains information about the recipients as well as other meta-data about the email. Content-Type, for instance, will help us identify if the message has an attachment. This information is typically the "key: value" format which will be useful for parsing the information. The body contains the actual message as well as any attachments. We will run code to separate these elements and then create features that might be useful for identification of spam vs. not spam.
+For this problem, we will be using the Spam Assassin Corpus which provides emails that can be used to train spam filters. A spam filter tries to judge whether or not an email is spam based on the contents and characteristics of an email. This corpus contains over nine thousand emails, pre-identified as spam or not-spam. There are five directories of messages: 3 folders for not spam and 2 for spam. Each folder contains full email messages including their header, body, and attachments. The header contains information about the recipients as well as other meta-data about the email. Content-Type, for instance, will help us identify if the message has an attachment. This information is typically the "key: value" format which will be useful for parsing the information. The body contains the actual message as well as any attachments. We will run code to separate these elements and then create features that might be useful for identification of spam vs. not spam.
 
 ## Dataset Preparation
 
@@ -95,5 +715,5 @@ We can potentially improve upon the model above by tuning the parameters of the 
 # References 
 
 (http://rdatasciencecases.org/) Case Studies in Data Science with R by Nolan and Lang.
-(http://www.cherryblossom.org/) Cherry Blossom Race website.
+(https://spamassassin.apache.org/downloads.cgi?update=20200129223) SpamAssassin Race website.
 
