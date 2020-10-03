@@ -650,16 +650,14 @@ results_tuned = results_combined[which(results_combined$F1==max(results_combined
 #rerun the model with the winning parameters to enable tree plotting
 set.seed(1234)
 model_rpart_tuned<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart',
-                            control=rpart.control(minsplit=5,
-                                                  maxdepth=29,
-                                                  cp=0
+                            control=rpart.control(minsplit=results_tuned$minsplit,
+                                                  maxdepth=results_tuned$maxdepth
                                                   ),
-                            na.action = na.omit)
+                            tuneGrid = cart_grid,na.action = na.omit)
 
-model_rpart_tuned
-#plot(model_rpart)
-
-#fancyRpartPlot(model_rpart$finalModel)
+#model_rpart_tuned
+#plot(model_rpart_tuned)
+#fancyRpartPlot(model_rpart_tuned$finalModel)
 ```
 
 # Introduction
