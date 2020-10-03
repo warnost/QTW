@@ -1,0 +1,73 @@
+---
+title: "Case Study - Parameter Tuning using Spam Data"
+date: "`r Sys.Date()`"
+author: "Allison Roderick, Jenna Ford, William Arnost"
+output:
+  rmdformats::readthedown:
+    number_sections: true
+    code_folding: hide
+    highlight: kate
+    toc_depth: 3
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE, include=FALSE}
+library(knitr)
+library(rmdformats)
+library(formatR)
+library(naniar)
+library(tidyverse)
+library(XML)
+library(RColorBrewer)
+library(wesanderson)
+library(ggplot2)
+library(gganimate)
+library(gifski)
+library(transformr)
+library(rcartocolor)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Code
+
+
+
+# Introduction
+
+  Many machine learning packages come with convenient features, including useful default parameters for many algorithms. While the default parameters are often good, they can be tailored to the specific problem being analyzed. In this case study, we will optimize the rpart decision tree algorithm to classify Spam messages from the SpamAssassin corpus. We will perform a grid search across multiple parameters to minimize the error on our dataset. We will also show visualizations to show how our model metrics improve over different values of these parameters.  
+
+We sourced the data from the case study website (http://rdatasciencecases.org/), but the corpus is also available at the SpamAssassin website here (https://spamassassin.apache.org/downloads.cgi?update=202001292230) 
+
+# Question
+
+Question 19: Consider the other parameters that can be used to control the recursive partitioning process. Read the documentation for them in the rpart.control() documentation. Also, carry out an Internet search for more information on how to tweak the rpart() tuning parameters. Experiment with values for these parameters. Do the trees that result make sense with your understanding of how the parameters are used? Can you improve the prediction using them?
+
+# Methods
+
+## Dataset
+
+For this problem, we will be using the Spam Assassin Corpus which provides emails that can be used to train spam filters. A spam filter tries to judge whether or not an email is spam based on the contents and characteristics of an email. This corpus contains over nine thousand emails, pre-identified as spam or not-spam. There are five directories of messages including 3 folders for not spam and 2 for spam. Each folder contains full email messages including their header, body, and attachments. The header contains information about the recipients as well as other meta-data about the email. Content-Type, for instance, will help us identify if the message has an attachment. This information is typically the "key: value" format which will be useful for parsing the information. The body contains the actual message as well as any attachments. We will run code to separate these elements and then create features that might be useful for identification of spam vs. not spam.
+
+## Dataset Preperation
+
+## Feature Creation
+
+# Parameter Tuning
+
+# Results
+
+# References 
+
+(http://rdatasciencecases.org/) Case Studies in Data Science with R by Nolan and Lang.
+(http://www.cherryblossom.org/) Cherry Blossom Race website.
+
