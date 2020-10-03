@@ -43,7 +43,7 @@ opts_knit$set(width=75)
 
 Use the bottom to the right to expand the code for reading in the emails and creating the dataset that will be used to model off of.
 
-```{r}
+```{r, eval=FALSE}
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 # set directory path
@@ -547,7 +547,7 @@ emailDF = createDerivedDF(emailStruct)
 
 Use the bottom to the right to expand the code for recursive partitioning using caret with method=rpart from R.
 
-```{r}
+```{r, eval=FALSE}
 ### recursive partitioning ###
 library(rpart)
 library(caret)
@@ -696,9 +696,38 @@ Our main goals in preparing each message is to seperate the header from the body
 
 `createDerivedDF` uses a list of functions to derive features for classification. This holder function allows us to easily add and remove functions for creating features without having to readjust our code each time.  
 
-### Derived features  
+Below is a description of each derived feature. This information is also available in Table 3.1 in Nolan and Lang.  
 
-
+`isSpam` is a True / False flag if a message is spam. This will be the dependent variable for modeling.  
+`isRe` is a True / False flag if a message is a reply to an earlier message.  
+`numLines` is an integer representing the number of lines in the message.  
+`bodyCharCt` is an integer count of the number of characters in the message.  
+`underscore` is a True / False flag that indicates if there is an underscore in the From field of the header.  
+`subExcCt` is a count of exclamation points in the subject line.    
+`subQuesCt` is a couint of question marks in the subject line.  
+`numAtt` is a count of the attachments in a message.  
+`priority` is a True / False flag if there is a priority key in the header.  
+`numRec` a count of the recipients of a message, including CCs.  
+`perCaps` the percentage of capital letters in the message body, not including attachments.  
+`isInReplyTo` is a True / False flag if there is a In-Reply-To key in the header.  
+`sortedRec` is a True / False flag if the recipient addresses are sorted.  
+`subPunc` is a True / False flag indicating if the subject has numbers or punctuation embedded in it.  
+`hour` hour of the day in the date field.  
+`multipartText` is a True / False flag if the MIME type is multipart/text.  
+`hasImages` is a True / False flag if the message contains images.  
+`isPGPsigned` True if the message contains a PGP signature.  
+`perHTML` percentage of characters in HTML tags vs. all characters in the message.  
+`subSpamWords` True if the subject contains words from the spam list.  
+`subBlanks` percentage of blanks in the subject.  
+`noHost` True if there is no hostname in the Message-Id key in the header.  
+`numEnd` True if the email senders name ends in a number (before the @).  
+`isYelling` True if the subject is in all capital letters.      
+`forwards` number of forward symbols in the message body.  
+`isOrigMsg` True if the message body contains the words "original message".  
+`isDear` True if the message body contains the word "dear".  
+`isWrote` True if the message body contains the word "wrote:".  
+`avgWordLen` The average length of words in the message.  
+`numDlr` number of dollar signs in the message body.  
 
 # Modeling
 
