@@ -961,38 +961,70 @@ f1 <- function(data, lev = NULL, model = NULL) {
 
 library(naivebayes)
 library(e1071)
+library(rpart)
 
 # make a dataframe of all the parameters to check
 # https://topepo.github.io/caret/available-models.html
-nb_grid<-expand.grid(laplace=c(0,0.1,0.3,0.5,1), usekernel=c(T,F), adjust=c(T,F))
+#nb_grid<-expand.grid(laplace=c(0,0.1,0.3,0.5,1), usekernel=c(T,F), adjust=c(T,F))
 
 # Then we create a trainControl object.  It tells caret how to train--using a cross-validation ('cv') with 3 folds in this case (number = 3).  
 # We want the final predictions of the best model and our summary is the custom function from above.
-train_control<-trainControl(method="cv", number=3, savePredictions = 'final',summaryFunction = f1)
+#train_control<-trainControl(method="cv", number=3, savePredictions = 'final',summaryFunction = f1)
 
 # Then we create our model: "model_nb".  We use the caret::train method.  We make 'isSpam' a factor because R is dumb and can't figure out that 1 and 0 are classes.  
-model_nb<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='naive_bayes',tuneGrid = nb_grid, na.action = na.omit)
-model_nb
+#model_nb<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='naive_bayes',tuneGrid = nb_grid, na.action = na.omit)
+#model_nb
 
 #Did the boss fool us with the folds?  Nope.
-table(model_nb$pred['Resample'])
+#table(model_nb$pred['Resample'])
 
-val<-seq(from = 0, to=0.01, by=0.0005)
-library(rpart)
-cart_grid<-expand.grid(cp=val)
+
+### rpart ###
+results_combined <- data.frame(minsplit=double(),
+                               maxdepth=double(),
+                               cp=double(),
+                               F1=double(),
+                               prec=double(),
+                               rec=double(),
+                               Type_I_err=double(),
+                               Type_II_err=double(),
+                               stringsAsFactors = FALSE)
+
+control_grid <- expand.grid(minsplit=seq(5,25,1),
+                            maxdepth=seq(15,30,1))
+
+cart_grid<-expand.grid(cp = seq(from = 0, to=0.01, by=0.0005))
+
 train_control<-trainControl(method="cv", number =5, savePredictions = 'final',summaryFunction = f1)
-model_rpart<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart',tuneGrid = cart_grid, na.action = na.omit)
-model_rpart
 
-library(randomForest)
-rf_grid<-expand.grid(mtry=seq(from =1, to = 25, by = 2))
-train_control<-trainControl(method="cv", number=3, savePredictions = 'final',summaryFunction = f1)
-model_rf<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, ntree=200,method='rf',tuneGrid = rf_grid, na.action = na.omit)
-model_rf
+for(i in 1:nrow(control_grid)) {
+  set.seed(1234)
+  model_rpart<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart',
+                            control=rpart.control(minsplit=control_grid$minsplit[i],
+                                                  maxdepth=control_grid$maxdepth[i]
+                                                  ),
+                            tuneGrid = cart_grid, na.action = na.omit)
 
-library(xgboost)
-xgb_grid<-expand.grid(nrounds = 100, max_depth = c(3,5,7,9,11), eta = c(0.01,0.03,0.1), gamma=c(1,3,5,10), colsample_bytree=1, min_child_weight=1, subsample=1)
-train_control<-trainControl(method="cv", number=3, savePredictions = 'final',summaryFunction = f1)
-model_xgb<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control,method='xgbTree',tuneGrid = xgb_grid, na.action = na.omit)
-model_xgb
+  results=as.data.frame(model_rpart$results)
+  results1=results[which(results$F1==max(results$F1)),]
+  
+  results_combined[i,"minsplit"] = control_grid$minsplit[i]
+  results_combined[i,"maxdepth"] = control_grid$maxdepth[i]
+  results_combined[i,"cp"] = results1$cp
+  results_combined[i,"F1"] = results1$F1
+  results_combined[i,"prec"] = results1$prec
+  results_combined[i,"rec"] = results1$rec
+  results_combined[i,"Type_I_err"] = results1$Type_I_err
+  results_combined[i,"Type_II_err"] = results1$Type_II_err
+}
+
+
+#model_rpart
+#plot(model_rpart)
+
+library(rattle)
+fancyRpartPlot(model_rpart$finalModel)
+
+
+
 
