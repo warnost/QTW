@@ -676,9 +676,29 @@ Question 19: Consider the other parameters that can be used to control the recur
 
 For this problem, we will be using the Spam Assassin Corpus which provides emails that can be used to train spam filters. A spam filter tries to judge whether or not an email is spam based on the contents and characteristics of an email. This corpus contains over nine thousand emails, pre-identified as spam or not-spam. There are five directories of messages: 3 folders for not spam and 2 for spam. Each folder contains full email messages including their header, body, and attachments. The header contains information about the recipients as well as other meta-data about the email. Content-Type, for instance, will help us identify if the message has an attachment. This information is typically the "key: value" format which will be useful for parsing the information. The body contains the actual message as well as any attachments. We will run code to separate these elements and then create features that might be useful for identification of spam vs. not spam.
 
-## Dataset Preparation
+## Dataset Preparation  
 
-## Feature Creation
+Our main goals in preparing each message is to seperate the header from the body, while also dealing with any attachments present. We will primarily use words from the body in our classification model, so we want to get those into a form where we can derive features from them. There are several functions that aid in this process.
+
+`splitMessage` is a function to assist in splitting the header from the body. It looks for the first blank line which is the boundary the two main parts of the email. It uses this index to assign each to their own object then returns them as a list.  
+
+`getBoundary` reads the header to determine the boundary that separates any attachments from the body. It uses regular expressions to search the header and determine the boundary.  
+
+`processHeader` is used to extract the "key: value" pairs from the header for later use.  
+
+`processAttach` separates out the attachment from the body with the help of the `getBoundary` function. It returns the body and some details about the attachment as a list.  
+
+`readEmail` this function reads the messages into R from their locations on the hard drive.  
+
+`processAllEmail` finally this function uses the functions above to separate each email message into its major components so we can derive features for classification from them.  
+
+## Feature Creation  
+
+`createDerivedDF` uses a list of functions to derive features for classification. This holder function allows us to easily add and remove functions for creating features without having to readjust our code each time.  
+
+### Derived features  
+
+
 
 # Modeling
 

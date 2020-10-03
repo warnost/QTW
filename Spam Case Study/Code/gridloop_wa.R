@@ -31,13 +31,15 @@ emailDFnum[is.na(emailDFnum)]<-0
 
 library(MLmetrics)
 f1 <- function(data, lev = NULL, model = NULL) {
-  #f1_val <- F1_Score(y_pred = data$pred, y_true = data$obs, positive = lev[1])
+  f1_val <- F1_Score(y_pred = data$pred, y_true = data$obs, positive = lev[1])
+  acc <- Accuracy(y_pred = data$pred, y_true = data$obs)
   p <- Precision(y_pred = data$pred, y_true = data$obs, positive = lev[1])
   r <- Recall(y_pred = data$pred, y_true = data$obs, positive = lev[1])
   fp <-sum(data$pred==0 & data$obs==1)/length(data$pred)  
   
   fn <-sum(data$pred==1 & data$obs==0)/length(data$pred)
   c(F1 = f1_val,
+    Accuracy = acc,
     prec = p,
     rec = r,
     Type_I_err=fp,
@@ -69,6 +71,7 @@ results_combined <- data.frame(minsplit=double(),
                                maxdepth=double(),
                                cp=double(),
                                F1=double(),
+                               Accuracy=double(),
                                prec=double(),
                                rec=double(),
                                Type_I_err=double(),
@@ -97,15 +100,16 @@ for(i in 1:nrow(control_grid)) {
   results_combined[i,"maxdepth"] = control_grid$maxdepth[i]
   results_combined[i,"cp"] = results1$cp
   results_combined[i,"F1"] = results1$F1
+  results_combined[i,"Accuracy"] = results1$Accuracy
   results_combined[i,"prec"] = results1$prec
   results_combined[i,"rec"] = results1$rec
   results_combined[i,"Type_I_err"] = results1$Type_I_err
   results_combined[i,"Type_II_err"] = results1$Type_II_err
   
-  print(i)
+  print(paste0(round(i/nrow(control_grid),4)*100,"% complete",sep=""))
 }
 
-
+save(results_combined,file="gridsearch_result.rda")
 #model_rpart
 #plot(model_rpart)
 
