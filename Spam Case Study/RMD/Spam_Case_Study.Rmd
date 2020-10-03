@@ -58,11 +58,37 @@ Question 19: Consider the other parameters that can be used to control the recur
 
 For this problem, we will be using the Spam Assassin Corpus which provides emails that can be used to train spam filters. A spam filter tries to judge whether or not an email is spam based on the contents and characteristics of an email. This corpus contains over nine thousand emails, pre-identified as spam or not-spam. There are five directories of messages including 3 folders for not spam and 2 for spam. Each folder contains full email messages including their header, body, and attachments. The header contains information about the recipients as well as other meta-data about the email. Content-Type, for instance, will help us identify if the message has an attachment. This information is typically the "key: value" format which will be useful for parsing the information. The body contains the actual message as well as any attachments. We will run code to separate these elements and then create features that might be useful for identification of spam vs. not spam.
 
-## Dataset Preperation
+## Dataset Preparation
 
 ## Feature Creation
 
-# Parameter Tuning
+# Modeling
+
+## CART
+
+For our models, we use the `caret` package, which contains many models available for training using its `train` function. The model we will use to predict whether an email is spam or not-spam is CART (Classification and Regression Trees). The CART algorithm can be visualized as a branching tree with leaves or "nodes" representing the algorithm's predictions and the branches are calculated splits based on features in the model's feature space, which, in our problem, different features of emails, as described in the Dataset Preparation section. The algorithm repeatedly splits each feature to find the split which results in the greatest information gain. We give a simple example of one possible CART below. 
+
+* In this model, the feature `perCaps` was determined to be the best initial split, or root node, of the data between non-spam (0) and spam (1). `perCaps < 13` checks the email message for whether the percentage of capital letters in the email is less than 13%. If it is, then it goes to the left node. Else, it goes to the right node.
+  + Left node: In addition to having less than 13% capitalized letters, if the message characters consist of less than 3.9% HTML tags, then we classify the message as non-spam. Otherwise, we classify the message as spam.
+  + Right node: In addition to having greater than or equal to 13% capitalized letters, if the message has less than 9.5 lines, then we classify the message as non-spam. Otherwise, we classify the message as spam.
+
+```{r}
+# Once Jenna puts in the code, this should give a depth 2 tree with 4 leaf nodes
+# Uncomment this later
+
+# set.seed(123)
+# model_rpart_example<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart',
+#                           control=rpart.control(maxdepth=2
+#                           ),
+#                           tuneGrid = cart_grid, na.action = na.omit)
+# 
+# fancyRpartPlot(model_rpart_example$finalModel)
+
+```
+
+## Parameter Tuning
+
+We can potentially improve upon the model above by tuning the parameters of the model. 
 
 # Results
 
