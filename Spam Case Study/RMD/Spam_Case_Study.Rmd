@@ -736,26 +736,42 @@ Below is a description of each derived feature. This information is also availab
 For our models, we use the `caret` package, which contains many models available for training using its `train` function. The model we will use to predict whether an email is spam or not-spam is CART (Classification and Regression Trees). The CART algorithm can be visualized as a branching tree with leaves or "nodes" representing the algorithm's predictions and the branches are calculated splits based on features in the model's feature space, which, in our problem, different features of emails, as described in the Dataset Preparation section. The algorithm repeatedly splits each feature to find the split which results in the greatest information gain. We give a simple example of one possible CART below. 
 
 * In this model, the feature `perCaps` was determined to be the best initial split, or root node, of the data between non-spam (0) and spam (1). `perCaps < 13` checks the email message for whether the percentage of capital letters in the email is less than 13%. If it is, then it goes to the left node. Else, it goes to the right node.
-  + Left node: In addition to having less than 13% capitalized letters, if the message characters consist of less than 3.9% HTML tags, then we classify the message as non-spam. Otherwise, we classify the message as spam.
-  + Right node: In addition to having greater than or equal to 13% capitalized letters, if the message has less than 9.5 lines, then we classify the message as non-spam. Otherwise, we classify the message as spam.
+  + Left node - `perHTML < 3.9`: In addition to having less than 13% capitalized letters, if the message characters consist of less than 3.9% HTML tags, then we classify the message as non-spam. Otherwise, we classify the message as spam.
+  + Right node - `numLines < 9.5`: In addition to having greater than or equal to 13% capitalized letters, if the message has less than 9.5 lines, then we classify the message as non-spam. Otherwise, we classify the message as spam.
 
-```{r}
-# Once Jenna puts in the code, this should give a depth 2 tree with 4 leaf nodes
-# Uncomment this later
+```{r eval=FALSE}
+# This is a basic example of a CART with maxdepth=2
+set.seed(123)
+model_rpart_example<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart',
+                          control=rpart.control(maxdepth=2),
+                          tuneGrid = cart_grid, na.action = na.omit)
 
-# set.seed(123)
-# model_rpart_example<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart',
-#                           control=rpart.control(maxdepth=2
-#                           ),
-#                           tuneGrid = cart_grid, na.action = na.omit)
-# 
-# fancyRpartPlot(model_rpart_example$finalModel)
+# Let us visualize the tree
+fancyRpartPlot(model_rpart_example$finalModel)
 
 ```
 
 ## Parameter Tuning
 
-We can potentially improve upon the model above by tuning the parameters of the model. 
+We can potentially improve upon the model above by tuning the parameters of the model. We took three different parameters--`cp`, `minsplit`, and `maxdepth`--and generated different CART models for each combination of unique values those parameters could take as outlined in Table 1. below.
+
+*Table 1. Parameters of `rpart::rpart.control` and `caret::train` and how they were tuned.*
+
+| Parameter | Description | Default Value | Tuning Method |
+| - | ------ | -- | - |  
+| `cp` | The complexity parameter is a threshold CART computes for each potential split of the tree. If the addition of another node increases the complexity of the tree by a value larger than `cp`, then the node does not get added. Hence, low values of `cp` may lead to overfitting. | `caret::train` will iterate over various values of `cp` to find the optimal model, while the default in `rpart::rpart` is `0.01` | `seq(from = 0, to=0.01, by=0.0005)` |  
+| `minsplit` | The minimum split parameter controls the minimum number of observations required to split a node. We started with a value of 5 rather than the absolute minimum, 1, because lower values of `minsplit` lead to overfitting. | `20` | `seq(5,25,1)` |  
+| `maxdepth` | The maximum depth parameter controls the maximum depth of the tree. Depending on the number of observations in the dataset, deeper trees could lead to overfitting. | `30` | `seq(15,30,1)` |  
+
+There are certain parameters we did not tune as explained in Table 2 below.
+
+*Table 2.  Parameters of `rpart::rpart.control` that we did not explicitly tune.*
+
+| Parameter | Description | Default Value |
+| - | ------ | -- |
+| `minbucket` | The minimum bucket value controls the minimum number of observations allowed in a terminal node. Given that the default value of this parameter is by default determined by the `minsplit` parameter, we only tuned `minsplit`. | `round(minsplit/3)` |
+|  `usesurrogate`, `maxsurrogate` | The parameters that control how surrogates behave only apply when there are missing values in the data. Our data does not contain missing values, and thus those parameters are irrelevant. | \- |
+
 
 # Results
 
