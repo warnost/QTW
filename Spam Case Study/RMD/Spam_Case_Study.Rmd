@@ -41,7 +41,7 @@ opts_knit$set(width=75)
 
 # Code
 
-Use the bottom to the right to expand the code for reading in the emails and creating the dataset that will be used to model off of.
+Use the button to the right to expand the code for reading in the emails and creating the dataset that will be used to model.
 
 ```{r, eval=FALSE}
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
@@ -545,7 +545,7 @@ getMessageRecipients = function(header) {
 emailDF = createDerivedDF(emailStruct)
 ```
 
-Use the bottom to the right to expand the code for recursive partitioning using caret with method=rpart from R.
+Use the button to the right to expand the code for recursive partitioning using `caret` with `method=rpart` from R.
 
 ```{r, eval=FALSE}
 ### recursive partitioning ###
@@ -579,8 +579,8 @@ f1 <- function(data, lev = NULL, model = NULL) {
   fp <-sum(data$pred==0 & data$obs==1)/length(data$pred)  
   
   fn <-sum(data$pred==1 & data$obs==0)/length(data$pred)
-  c(F1 = f1_val,
-    prec = p,
+  c(prec = p,
+    F1 = f1_val,
     rec = r,
     Type_I_err=fp,
     Type_II_err=fn)
@@ -594,9 +594,6 @@ library(rpart)
 train_control<-trainControl(method="cv", number =5, savePredictions = 'final',summaryFunction = f1)
 set.seed(1234)
 model_rpart_defaults<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart', na.action = na.omit)
-
-library(rattle)
-#fancyRpartPlot(model_rpart_defaults$finalModel)
 
 ### rpart with parameter tuning###
 # create dataset to hold the results
@@ -645,7 +642,7 @@ for(i in 1:nrow(control_grid)) {
 }
 
 #identify the winning model's parameters
-results_tuned = results_combined[which(results_combined$F1==max(results_combined$F1)),]
+results_tuned = results_combined[which(results_combined$prec==max(results_combined$prec)),]
 
 #rerun the model with the winning parameters to enable tree plotting
 set.seed(1234)
@@ -654,31 +651,27 @@ model_rpart_tuned<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl
                                                   maxdepth=results_tuned$maxdepth
                                                   ),
                             tuneGrid = cart_grid,na.action = na.omit)
-
-#model_rpart_tuned
-#plot(model_rpart_tuned)
-#fancyRpartPlot(model_rpart_tuned$finalModel)
 ```
 
 # Introduction
 
-Many machine learning packages come with convenient features, including useful default parameters for many algorithms. While the default parameters are often good, they can be tailored to the specific problem being analyzed. In this case study, we will optimize the rpart decision tree algorithm to classify Spam messages from the SpamAssassin corpus. We will perform a grid search across multiple parameters to minimize the error on our dataset. We will also show visualizations to show how our model metrics improve over different values of these parameters.  
+Many machine learning packages come with convenient features, including useful default parameters for many algorithms. While the default parameters are often good, they can be tailored to the specific problem being analyzed. In this case study, we will optimize the `rpart` decision tree algorithm to classify Spam messages from the SpamAssassin corpus. We will perform a grid search across multiple parameters to minimize the error on our dataset. We will also show visualizations to show how our model metrics improve over different values of these parameters.  
 
 We sourced the data from the [Data Science in R website](http://rdatasciencecases.org/), but the corpus is also available at the [SpamAssassin website](https://spamassassin.apache.org/downloads.cgi?update=202001292230) 
 
 # Question
 
-Question 19: Consider the other parameters that can be used to control the recursive partitioning process. Read the documentation for them in the rpart.control() documentation. Also, carry out an Internet search for more information on how to tweak the rpart() tuning parameters. Experiment with values for these parameters. Do the trees that result make sense with your understanding of how the parameters are used? Can you improve the prediction using them?
+Question 19: Consider the other parameters that can be used to control the recursive partitioning process. Read the documentation for them in the `rpart.control` documentation. Also, carry out an Internet search for more information on how to tweak the `rpart` tuning parameters. Experiment with values for these parameters. Do the trees that result make sense with your understanding of how the parameters are used? Can you improve the prediction using them?
 
 # Methods
 
 ## Dataset
 
-For this problem, we will be using the Spam Assassin Corpus which provides emails that can be used to train spam filters. A spam filter tries to judge whether or not an email is spam based on the contents and characteristics of an email. This corpus contains over nine thousand emails, pre-identified as spam or not-spam. There are five directories of messages: 3 folders for not spam and 2 for spam. Each folder contains full email messages including their header, body, and attachments. The header contains information about the recipients as well as other meta-data about the email. Content-Type, for instance, will help us identify if the message has an attachment. This information is typically the "key: value" format which will be useful for parsing the information. The body contains the actual message as well as any attachments. We will run code to separate these elements and then create features that might be useful for identification of spam vs. not spam.
+For this problem, we will be using the Spam Assassin Corpus which provides emails that can be used to train spam filters. A spam filter tries to judge whether or not an email is spam based on the contents and characteristics of an email. This corpus contains over nine thousand emails, pre-identified as spam or not-spam. There are five directories of messages: 3 folders for not spam and 2 for spam. Each folder contains full email messages including their header, body, and attachments. The header contains information about the recipients as well as other meta-data about the email. Content-Type, for instance, will help us identify if the message has an attachment. This information is typically in a "key: value" format which will be useful for parsing the information. The body contains the actual message as well as any attachments. We will run code to separate these elements and then create features that might be useful for identification of spam vs. not spam.
 
 ## Dataset Preparation  
 
-Our main goals in preparing each message is to seperate the header from the body, while also dealing with any attachments present. We will primarily use words from the body in our classification model, so we want to get those into a form where we can derive features from them. There are several functions that aid in this process.
+Our main goals in preparing each message is to separate the header from the body, while also dealing with any attachments present. We will primarily use certain identifiable aspects of the email in the classification model, but first we need to get the emails into a form where we can derive features from them. There are several functions that aid in this process:
 
 `splitMessage` is a function to assist in splitting the header from the body. It looks for the first blank line which is the boundary the two main parts of the email. It uses this index to assign each to their own object then returns them as a list.  
 
@@ -735,9 +728,9 @@ Below is a description of each derived feature. This information is also availab
 
 For our models, we use the `caret` package, which contains many models available for training using its `train` function. The model we will use to predict whether an email is spam or not-spam is CART (Classification and Regression Trees). The CART algorithm can be visualized as a branching tree with leaves or "nodes" representing the algorithm's predictions and the branches are calculated splits based on features in the model's feature space, which, in our problem, different features of emails, as described in the Dataset Preparation section. The algorithm repeatedly splits each feature to find the split which results in the greatest information gain. We give a simple example of one possible CART below. 
 
-* In this model, the feature `perCaps` was determined to be the best initial split, or root node, of the data between non-spam (0) and spam (1). `perCaps < 13` checks the email message for whether the percentage of capital letters in the email is less than 13%. If it is, then it goes to the left node. Else, it goes to the right node.
-  + Left node - `perHTML < 3.9`: In addition to having less than 13% capitalized letters, if the message characters consist of less than 3.9% HTML tags, then we classify the message as non-spam. Otherwise, we classify the message as spam.
-  + Right node - `numLines < 9.5`: In addition to having greater than or equal to 13% capitalized letters, if the message has less than 9.5 lines, then we classify the message as non-spam. Otherwise, we classify the message as spam.
+`Figure 1` shows the resulting CART tree for the spam data, using `maxdepth=2`. In this model, the feature `perCaps` was determined to be the best initial split, or root node, of the data between non-spam (0) and spam (1). `perCaps < 13` checks the email message for whether the percentage of capital letters in the email is less than 13%. If it is, then it goes to the left node. Else, it goes to the right node.
+  * Left node - `perHTML < 3.9`: In addition to having less than 13% capitalized letters, if the message characters consist of less than 3.9% HTML tags, then we classify the message as non-spam. Otherwise, we classify the message as spam.
+  * Right node - `numLines < 9.5`: In addition to having greater than or equal to 13% capitalized letters, if the message has less than 9.5 lines, then we classify the message as non-spam. Otherwise, we classify the message as spam.
 
 ```{r eval=FALSE}
 # This is a basic example of a CART with maxdepth=2
@@ -747,13 +740,15 @@ model_rpart_example<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trContr
                           tuneGrid = cart_grid, na.action = na.omit)
 
 # Let us visualize the tree
-fancyRpartPlot(model_rpart_example$finalModel)
+fancyRpartPlot(model_rpart_example$finalModel,main="Figure 1: CART Tree with maxdepth=2")
 
 ```
 
+We use the `rpart` package and `rpart` method in `caret` to implement CART in this case study. 
+
 ## Parameter Tuning
 
-We can potentially improve upon the model above by tuning the parameters of the model. We took three different parameters--`cp`, `minsplit`, and `maxdepth`--and generated different CART models for each combination of unique values those parameters could take as outlined in Table 1. below.
+We can potentially improve upon the model above by tuning the parameters of the model. We took three different parameters--`cp`, `minsplit`, and `maxdepth`--and generated different CART models for each combination of unique values those parameters could take (see `Table 1`).
 
 *Table 1. Parameters of `rpart::rpart.control` and `caret::train` and how they were tuned.*
 
@@ -763,7 +758,7 @@ We can potentially improve upon the model above by tuning the parameters of the 
 | `minsplit` | The minimum split parameter controls the minimum number of observations required to split a node. We started with a value of 5 rather than the absolute minimum, 1, because lower values of `minsplit` lead to overfitting. | `20` | `seq(5,25,1)` |  
 | `maxdepth` | The maximum depth parameter controls the maximum depth of the tree. Depending on the number of observations in the dataset, deeper trees could lead to overfitting. | `30` | `seq(15,30,1)` |  
 
-There are certain parameters we did not tune as explained in Table 2 below.
+There are certain parameters we did not tune as explained in `Table 2` below.
 
 *Table 2.  Parameters of `rpart::rpart.control` that we did not explicitly tune.*
 
@@ -772,8 +767,46 @@ There are certain parameters we did not tune as explained in Table 2 below.
 | `minbucket` | The minimum bucket value controls the minimum number of observations allowed in a terminal node. Given that the default value of this parameter is by default determined by the `minsplit` parameter, we only tuned `minsplit`. | `round(minsplit/3)` |
 |  `usesurrogate`, `maxsurrogate` | The parameters that control how surrogates behave only apply when there are missing values in the data. Our data does not contain missing values, and thus those parameters are irrelevant. | \- |
 
+## Evaluation Metric
+
+Several evaluation metrics can be used to evaluate performance for a classification algorithm:
+
+* Accuracy - ratio of correctly classified observations to the total observations
+* Precision - ratio of correctly predicted spam emails to the total predicted spam emails
+* Recall - ratio of correctly predicted spam emails to the total number of actual spam emails
+* F1 - weighted average of precision and recall that looks at both false positives and false negatives
+* Type I Errors - incorrect identification of an email as spam
+* Type II Errors - incorrect identification of an email as not spam
+
+There are benefits and downsides to the various evaluation metrics listed above. Accuracy is easy to understand, but it treats false positives (incorrectly identifying an email as spam) and false negatives (failing to identify an email as spam) equally. For spam, we assume that people would prefer to get the occasional spam email instead of potentially not seeing an important email because it is misclassified as spam. Therefore, our primary objective is to maximize the precision of spam.
 
 # Results
+
+336 different combinations of `minsplit` and `maxdepth` were passed to the the `caret::train` function. The `rpart` method was able to tune `cp` independently. 21 different values of `cp` were evaluated for each combination of `minsplit` and `maxdepth.` This totals 7,056 combinations of `minsplit`, `maxdepth` and `cp` that were evaluated. 
+
+The winning model with the highest precision used the following parameter values: `cp` = 0, `minsplit` = 6, and `maxdepth` = 29. The resulting precision is 96.75%. We compared this to the model using the default values for parameters: `cp` = 0.07 (`cp` was tuned by default as part of `rpart` in `caret::train`), `minsplit` = 20, and `maxdepth` = 30. The resulting precision for the default model was 86.84%. Tuning parameters increased precision from 86.84% to 96.75%.
+
+`Figure 2` below shows the CART tree for the model using default values for the control parameters. The first split on the tree is `perCaps < 13`. The second split on the tree in `perHTML < 3.9`.
+
+```{r}
+library(rattle)
+# tree with defaults
+fancyRpartPlot(model_rpart_defaults$finalModel, main="Figure 2. CART Tree with Default Paramter Values")
+```
+
+The CART tree for the winning model, `Figure 3`, is shown below. We display this plot only to show the difference in complexity and the increase in `maxdepth`. The `maxdepth` makes this tree not easy to visualize.
+
+```{r}
+#model_rpart_tuned
+plot(model_rpart_tuned)
+fancyRpartPlot(model_rpart_tuned$finalModel, main="Figure 3. CART Tree with Tuned Paramter Values")
+```
+
+The output below shows the text output for the winning model that corresponds to the tree in `Figure 3`.
+
+```{r}
+model_rpart_tuned$finalModel
+```
 
 # References 
 
