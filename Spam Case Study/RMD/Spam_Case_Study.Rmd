@@ -43,8 +43,8 @@ opts_knit$set(width=75)
 
 Use the button to the right to expand the code for reading in the emails and creating the dataset that will be used to model.
 
-```{r, eval=FALSE}
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+```{r}
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 # set directory path
 spamPath = "../Data"
@@ -547,7 +547,7 @@ emailDF = createDerivedDF(emailStruct)
 
 Use the button to the right to expand the code for recursive partitioning using `caret` with `method=rpart` from R.
 
-```{r, eval=FALSE}
+```{r}
 ### recursive partitioning ###
 library(rpart)
 library(caret)
@@ -732,8 +732,9 @@ For our models, we use the `caret` package, which contains many models available
   * Left node - `perHTML < 3.9`: In addition to having less than 13% capitalized letters, if the message characters consist of less than 3.9% HTML tags, then we classify the message as non-spam. Otherwise, we classify the message as spam.
   * Right node - `numLines < 9.5`: In addition to having greater than or equal to 13% capitalized letters, if the message has less than 9.5 lines, then we classify the message as non-spam. Otherwise, we classify the message as spam.
 
-```{r eval=FALSE}
+```{r}
 # This is a basic example of a CART with maxdepth=2
+library(rattle)
 set.seed(123)
 model_rpart_example<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trControl = train_control, method='rpart',
                           control=rpart.control(maxdepth=2),
@@ -789,7 +790,6 @@ The winning model with the highest precision used the following parameter values
 `Figure 2` below shows the CART tree for the model using default values for the control parameters. The first split on the tree is `perCaps < 13`. The second split on the tree in `perHTML < 3.9`.
 
 ```{r}
-library(rattle)
 # tree with defaults
 fancyRpartPlot(model_rpart_defaults$finalModel, main="Figure 2. CART Tree with Default Paramter Values")
 ```
