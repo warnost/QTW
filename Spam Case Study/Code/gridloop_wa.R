@@ -81,7 +81,7 @@ results_combined <- data.frame(minsplit=double(),
 control_grid <- expand.grid(minsplit=seq(5,25,1),
                             maxdepth=seq(15,30,1))
 
-cart_grid<-expand.grid(cp = seq(from = 0, to=0.01, by=0.0005))
+cart_grid<-expand.grid(cp = seq(from = 0, to=0.1, by=0.001))
 
 train_control<-trainControl(method="cv", number =5, savePredictions = 'final',summaryFunction = f1)
 
@@ -105,11 +105,12 @@ for(i in 1:nrow(control_grid)) {
   results_combined[i,"rec"] = results1$rec
   results_combined[i,"Type_I_err"] = results1$Type_I_err
   results_combined[i,"Type_II_err"] = results1$Type_II_err
-  
+  #results_combined$model <- model_rpart
   print(paste0(round(i/nrow(control_grid),4)*100,"% complete",sep=""))
 }
 
-save(results_combined,file="gridsearch_result.rda")
+library(dplyr)
+save(results_combined,file="gridsearch_result2.rda")
 #model_rpart
 #plot(model_rpart)
 
