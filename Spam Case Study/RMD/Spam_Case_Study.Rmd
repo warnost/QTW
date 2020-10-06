@@ -738,7 +738,7 @@ model_rpart_example<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trContr
                           tuneGrid = cart_grid, na.action = na.omit)
 
 # Let us visualize the tree
-fancyRpartPlot(model_rpart_example$finalModel,main="Figure 1: CART Tree with maxdepth=2")
+fancyRpartPlot(model_rpart_example$finalModel,sub="", main="Figure 1: CART Tree with maxdepth=2")
 
 ```
 
@@ -752,7 +752,7 @@ We can potentially improve upon the model above by tuning the parameters of the 
 
 | Parameter | Description | Default Value | Tuning Method |
 | - | ------ | -- | - |  
-| `cp` | The complexity parameter is a threshold CART computes for each potential split of the tree. If the addition of another node increases the complexity of the tree by a value larger than `cp`, then the node does not get added. Hence, low values of `cp` may lead to overfitting. | `caret::train` will iterate over various values of `cp` to find the optimal model, while the default in `rpart::rpart` is `0.01` | `seq(from = 0, to=0.01, by=0.0005)` |  
+| `cp` | The complexity parameter is a threshold CART computes for each potential split of the tree. If the addition of another node increases the complexity of the tree by a value larger than `cp`, then the node does not get added. Hence, low values of `cp` may lead to overfitting. | `caret::train` will iterate over various values of `cp` to find the optimal model, while the default in `rpart::rpart` is `0.01` | `seq(from = 0, to=0.01, by=0.001)` |  
 | `minsplit` | The minimum split parameter controls the minimum number of observations required to split a node. We started with a value of 5 rather than the absolute minimum, 1, because lower values of `minsplit` lead to overfitting. | `20` | `seq(5,25,1)` |  
 | `maxdepth` | The maximum depth parameter controls the maximum depth of the tree. Depending on the number of observations in the dataset, deeper trees could lead to overfitting. | `30` | `seq(15,30,1)` |  
 
@@ -780,7 +780,7 @@ There are benefits and downsides to the various evaluation metrics listed above.
 
 # Results
 
-336 different combinations of `minsplit` and `maxdepth` were passed to the the `caret::train` function. The `rpart` method was able to tune `cp` independently. 21 different values of `cp` were evaluated for each combination of `minsplit` and `maxdepth.` This totals 7,056 combinations of `minsplit`, `maxdepth` and `cp` that were evaluated. 
+336 different combinations of `minsplit` and `maxdepth` were passed to the the `caret::train` function. The `rpart` method was able to tune `cp` independently. 101 different values of `cp` were evaluated for each combination of `minsplit` and `maxdepth.` This totals 33,936 combinations of `minsplit`, `maxdepth` and `cp` that were evaluated. 
 
 The winning model with the highest precision used the following parameter values: `cp` = 0, `minsplit` = 6, and `maxdepth` = 29. The resulting precision is 96.75%. We compared this to the model using the default values for parameters: `cp` = 0.07 (`cp` was tuned by default as part of `rpart` in `caret::train`), `minsplit` = 20, and `maxdepth` = 30. The resulting precision for the default model was 86.84%. Tuning parameters increased precision from 86.84% to 96.75%.
 
@@ -788,22 +788,27 @@ The winning model with the highest precision used the following parameter values
 
 ```{r}
 # tree with defaults
-fancyRpartPlot(model_rpart_defaults$finalModel, main="Figure 2. CART Tree with Default Paramter Values")
+par(mar=c(5,4,10,2))
+fancyRpartPlot(model_rpart_defaults$finalModel, sub="", main="Figure 2. CART Tree with Default Paramter Values")
 ```
 
 The CART tree for the winning model, `Figure 3`, is shown below. We display this plot only to show the difference in complexity and the increase in `maxdepth`. The `maxdepth` makes this tree not easy to visualize.
 
 ```{r}
 #model_rpart_tuned
-plot(model_rpart_tuned)
-fancyRpartPlot(model_rpart_tuned$finalModel, main="Figure 3. CART Tree with Tuned Paramter Values")
+fancyRpartPlot(model_rpart_tuned$finalModel, sub="", main="Figure 3. CART Tree with Tuned Paramter Values")
 ```
 
-The output below shows the text output for the winning model that corresponds to the tree in `Figure 3`.
+Printing the output from `Figure 3` is also quite verbose and we have choosen not to print it here. However, the first split on `perCaps` and the subsequent split for each branch are detailed below:
 
-```{r}
-model_rpart_tuned$finalModel
-```
+* Root Node
+  + `perCaps` < 12.86: There are 8038 emails in this node. 1391 emails (17%) are incorrectly classified as spam. 
+    + `perHTML` < 3.93: There are 7401 emails in this node. 970 emails (13%) are incorrectly classified as spam.
+    + `perHTML` >= 3.93 There are 637 emails in this node. 216 (34%) emails are incorrectly classified as not spam.
+  + `perCaps` >= 12.86: There are 1310 emails in this node. 304 emails (23%) are incorrectly classified as not spam.
+    + `numLines` < 9.5: There are 138 emails in this node. 17 emails (12%) are incorrectly classified as spam.
+    + `numLines' >= 9.5: There are 1172 emails in this node. 183 emails (16%) are incorrectly classified as not spam.
+
 
 # References 
 
