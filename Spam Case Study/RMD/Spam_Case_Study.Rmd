@@ -781,11 +781,11 @@ There are benefits and downsides to the various evaluation metrics listed above.
 
 ## Effects of Parameter tuning
 
-The three graphs below show the effects of our parameter tuning. We compare the effects of different parameter values using a 3D mesh. Higher precision is better, so peaks in the 3D surface represent the best values of precision for a given combination of input parameters. We could use a 2D line to represent the best value of a parameter in isolation, but the 3D surface allows us to see the interaction between parameters.  
+The three graphs below show the effects of our parameter tuning. We compare the effects of different parameter values using a 3D mesh. Higher precision is better, so peaks in the 3D surface represent the best values of precision for a given combination of input parameters. We could use a 2D line to represent the best value of a parameter in isolation, but the 3D surface allows us to see the interaction between parameters. Since we have 3 parameters we are tuning, there will be multiple observations for any given combination of the two factors in the 3D plot. We take the average precision of the points for plotting purposes.   
 
-In `Figure 1`, we compare complexity and minsplit. The peak appears near complexity = 0 and minsplit = 6. For minsplit values less than 25, there is a plateau in precision from cp=0.23 to cp=0.87. Precision rapidly increases from cp=0.1 to cp=0.8, and again from cp=0.2 to cp=0. For any given value of cp, changing minsplit doesn't seem to have much effect.
+In `Figure 1`, we compare complexity and minsplit. For minsplit values less than 25, there is a plateau in precision from cp=0.23 to cp=0.87. Precision rapidly increases from cp=0.1 to cp=0.8, and again from cp=0.2 to cp=0. For any given value of cp, changing minsplit doesn't seem to have much effect.
 ```{r}
-plot_data <- final_result
+plot_data <- final_result %>% group_by(cp, minsplit) %>% summarise_all(mean) %>% select(prec, cp, minsplit)
 # volcano is a numeric matrix that ships with R
 fig <- plot_ly(z=plot_data$prec, x=plot_data$cp, y=plot_data$minsplit, type = 'mesh3d', opacity = 0.7)
 fig <- fig %>% layout(
@@ -797,9 +797,10 @@ fig <- fig %>% layout(
   ))
 fig
 ```
-In `Figure 2`, we compare complexity and maxdepth. The peak appears near complexity = 0 and maxdepth = 29. For minsplit values less than 30, there is a plateau in precision from cp=0.23 to cp=0.87. Precision rapidly increases from cp=0.1 to cp=0.87, and again from cp=0.23 to cp=0. For any given value of cp, changing maxdepth doesn't seem to have much effect.
+In `Figure 2`, we compare complexity and maxdepth. For maxdepth values less than 30, there is a plateau in precision from cp=0.23 to cp=0.87. Precision rapidly increases from cp=0.1 to cp=0.87, and again from cp=0.23 to cp=0. For any given value of cp, changing maxdepth doesn't seem to have much effect.
 
 ```{r}
+plot_data <- final_result %>% group_by(cp, maxdepth) %>% summarise_all(mean) %>% select(prec, cp, maxdepth)
 fig2 <- plot_ly(z=plot_data$prec, x=plot_data$cp, y=plot_data$maxdepth, type = 'mesh3d', opacity = 0.7)
 fig2 <- fig2 %>% layout(
   title = "Figure 2: Change in Precision for different values of CP and Max Depth",
@@ -811,12 +812,13 @@ fig2 <- fig2 %>% layout(
 fig2
 ```
 
-In `Figure 3` we compare different levels of maxdepth and minsplit. There are many peaks across the 3D plane, suggesting that there are several different levels of these parameters that could help maximize precision. Given the results of figure 1 and 2, I think optimization could be focused on complexity and either minsplit or maxdepth. Both may not be required for this data.  
+In `Figure 3` we compare different levels of maxdepth and minsplit. Here we can see the highest precision values when minsplit is low and depth is high. When minsplit is in the 15-25 range, we see larger increases in precision when depth increases from 15 to 20. Past depth = 20, the increases to precision are small for minsplit 15-25. For minsplit 5-15, precision increases across the whole range of depths we tested. Decreases in split generally result in higher precision across different depths, although we see 3 peaks/troughs leading up to the maximum precision.  
 
 ```{r}
+plot_data <- final_result %>% group_by(minsplit, maxdepth) %>% summarise_all(mean) %>% select(prec, minsplit, maxdepth)
 fig3 <- plot_ly(z=plot_data$prec, x=plot_data$minsplit, y=plot_data$maxdepth, type = 'mesh3d', opacity = 0.7)
 fig3 <- fig3 %>% layout(
-  title = "Figure3 Change in Precision for different values of Minsplit and Maxdepth",
+  title = "Figure 3: Change in Precision for different values of Minsplit and Maxdepth",
   scene = list(
     xaxis = list(title = "split"),
     yaxis = list(title = "depth"),
