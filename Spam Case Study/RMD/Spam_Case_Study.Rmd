@@ -549,7 +549,7 @@ save(emailDF, file="emailDFknit.rda")
 
 Use the button to the right to expand the code for recursive partitioning using `caret` with `method=rpart` from R.
 
-```{r,eval=FALSE}
+```{r}
 load(file="emailDFknit.rda")
 ### recursive partitioning ###
 library(rpart)
@@ -568,7 +568,7 @@ setupRnum = function(data) {
 emailDFnum = setupRnum(emailDF)
 
 emailDFnum[is.na(emailDFnum)]<-0
-
+#save(emailDFnum,file="emailDFnum.rda")
 
 # Because our authors prefer Type I/II errors, but the cool kids know that precision/recall/F1 is where its at, while the default of caret is accuracy and kappa.  
 # To get us all on the same page, I create a function that returns the metrics we want.  
@@ -608,7 +608,9 @@ cart_grid<-expand.grid(cp = seq(from = 0, to=0.1, by=0.001))
 
 # train function for 5-fold cross validation
 train_control<-trainControl(method="cv", number =5, savePredictions = 'final',summaryFunction = f1)
+```
 
+```{r, eval=FALSE}
 # loop to tune cp, minsplit and maxdepth
 for(i in 1:nrow(control_grid)) {
   set.seed(1234)
@@ -628,11 +630,14 @@ for(i in 1:nrow(control_grid)) {
   #print(paste0(round(i/nrow(control_grid),4)*100,"% complete",sep=""))
 }
 ```
+
 ```{r,eval=FALSE}
 save(final_result,file="final_result_knit.rda")
 #identify the winning model's parameters
 ```
+
 ```{r}
+load(file="emailDFnum.rda")
 load(file="final_result_knit.rda")
 results_tuned = final_result[which(final_result$prec==max(final_result$prec)),]
 
