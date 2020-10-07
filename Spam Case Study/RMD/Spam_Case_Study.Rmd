@@ -548,7 +548,7 @@ emailDF = createDerivedDF(emailStruct)
 save(emailDF, file="emailDFknit.rda")
 ```
 
-Use the button to the right to expand the code for recursive partitioning using `caret` with `method=rpart` from R.
+Use the buttons to the right to expand the code for recursive partitioning using `caret` with `method=rpart` from R.
 
 ```{r}
 load(file="emailDFknit.rda")
@@ -730,6 +730,10 @@ For our models, we use the `caret` package, which contains many models available
   * Left node - `perHTML < 3.9`: In addition to having less than 13% capitalized letters, if the message characters consist of less than 3.9% HTML tags, then we classify the message as non-spam. Otherwise, we classify the message as spam.
   * Right node - `numLines < 9.5`: In addition to having greater than or equal to 13% capitalized letters, if the message has less than 9.5 lines, then we classify the message as non-spam. Otherwise, we classify the message as spam.
 
+<font size="4">
+<center> **Figure 1: CART Tree with maxdepth=2** </center>
+</font>
+
 ```{r}
 # This is a basic example of a CART with maxdepth=2
 
@@ -739,7 +743,7 @@ model_rpart_example<-caret::train(as.factor(isSpam) ~ .,data=emailDFnum, trContr
                           tuneGrid = cart_grid, na.action = na.omit)
 
 # Let us visualize the tree
-fancyRpartPlot(model_rpart_example$finalModel,sub="", main="Figure 1: CART Tree with maxdepth=2")
+fancyRpartPlot(model_rpart_example$finalModel,sub="")
 
 ```
 
@@ -781,48 +785,59 @@ There are benefits and downsides to the various evaluation metrics listed above.
 
 ## Effects of Parameter tuning
 
-The three graphs below show the effects of our parameter tuning. We compare the effects of different parameter values using a 3D mesh. Higher precision is better, so peaks in the 3D surface represent the best values of precision for a given combination of input parameters. We could use a 2D line to represent the best value of a parameter in isolation, but the 3D surface allows us to see the interaction between parameters. Since we have 3 parameters we are tuning, there will be multiple observations for any given combination of the two factors in the 3D plot. We take the average precision of the points for plotting purposes.   
+The three graphs below show the effects of our parameter tuning. We compare the effects of different parameter values using a 3D mesh. Higher precision is better, so peaks in the 3D surface represent the best values of precision for a given combination of input parameters. We could use a 2D line to represent the best value of a parameter in isolation, but the 3D surface allows us to see the interaction between parameters. Since we have 3 parameters we are tuning, there will be multiple observations for any given combination of the two factors in the 3D plot. We take the average precision of the points for plotting purposes. Please note that `Figure 2`, `Figure 3`, and `Figure 4` are interactive and you can move the plots around.   
 
-In `Figure 1`, we compare complexity and minsplit. For minsplit values less than 25, there is a plateau in precision from cp=0.23 to cp=0.87. Precision rapidly increases from cp=0.1 to cp=0.8, and again from cp=0.2 to cp=0. For any given value of cp, changing minsplit doesn't seem to have much effect.
+In `Figure 2`, we compare `complexity` and `minsplit.` For `minsplit` values less than 25, there is a plateau in precision between cp=0.023 to cp=0.087. Precision rapidly increases from cp=0.09 to cp=0.08, and again from cp=0.02 to cp=0. For any given value of cp, changing `minsplit` doesn't seem to have much effect.
+
+<font size="4">
+<center> **Figure 2: Change in Precision for different values of CP and Minsplit** </center>
+</font>
+
 ```{r}
 plot_data <- final_result %>% group_by(cp, minsplit) %>% summarise_all(mean) %>% select(prec, cp, minsplit)
 # volcano is a numeric matrix that ships with R
 fig <- plot_ly(z=plot_data$prec, x=plot_data$cp, y=plot_data$minsplit, type = 'mesh3d', opacity = 0.7)
 fig <- fig %>% layout(
-  title = "Figure 1: Change in Precision for different values of CP and Minsplit",
   scene = list(
     xaxis = list(title = "Complexity"),
     yaxis = list(title = "Minsplit"),
-    zaxis = list(title = "F1")
+    zaxis = list(title = "Precision")
   ))
 fig
 ```
-In `Figure 2`, we compare complexity and maxdepth. For maxdepth values less than 30, there is a plateau in precision from cp=0.23 to cp=0.87. Precision rapidly increases from cp=0.1 to cp=0.87, and again from cp=0.23 to cp=0. For any given value of cp, changing maxdepth doesn't seem to have much effect.
+
+In `Figure 3`, we compare `complexity` and `maxdepth.` For `maxdepth` values less than 30, there is a plateau in precision from cp=0.08 to cp=0.023. Precision rapidly increases from cp=0.01 to cp=0.08, and again from cp=0.023 to cp=0. For any given value of cp, changing `maxdepth` doesn't seem to have much effect.
+
+<font size="4">
+<center> **Figure 3: Change in Precision for different values of CP and Max Depth** </center>
+</font>
 
 ```{r}
 plot_data <- final_result %>% group_by(cp, maxdepth) %>% summarise_all(mean) %>% select(prec, cp, maxdepth)
 fig2 <- plot_ly(z=plot_data$prec, x=plot_data$cp, y=plot_data$maxdepth, type = 'mesh3d', opacity = 0.7)
 fig2 <- fig2 %>% layout(
-  title = "Figure 2: Change in Precision for different values of CP and Max Depth",
   scene = list(
     xaxis = list(title = "Complexity"),
-    yaxis = list(title = "depth"),
-    zaxis = list(title = "prec")
+    yaxis = list(title = "Depth"),
+    zaxis = list(title = "Precision")
   ))
 fig2
 ```
 
-In `Figure 3` we compare different levels of maxdepth and minsplit. Here we can see the highest precision values when minsplit is low and depth is high. When minsplit is in the 15-25 range, we see larger increases in precision when depth increases from 15 to 20. Past depth = 20, the increases to precision are small for minsplit 15-25. For minsplit 5-15, precision increases across the whole range of depths we tested. Decreases in split generally result in higher precision across different depths, although we see 3 peaks/troughs leading up to the maximum precision.  
+In `Figure 4` we compare different levels of `maxdepth` and `minsplit.` Here we can see the highest precision values when `minsplit` is low and `maxdepth` is high. When `minsplit` is in the 15-25 range, we see larger increases in precision when `maxdepth` increases from 15 to 20. Past `maxdepth` = 20, the increases to precision are small for `minsplit` 15-25. For `minsplit` 5-15, precision increases across the whole range of depths we tested. Decreases in split generally result in higher precision across different depths, although we see 3 peaks/troughs leading up to the maximum precision.  
+
+<font size="4">
+<center> **Figure 4: Change in Precision for different values of Minsplit and Maxdepth** </center>
+</font>
 
 ```{r}
 plot_data <- final_result %>% group_by(minsplit, maxdepth) %>% summarise_all(mean) %>% select(prec, minsplit, maxdepth)
 fig3 <- plot_ly(z=plot_data$prec, x=plot_data$minsplit, y=plot_data$maxdepth, type = 'mesh3d', opacity = 0.7)
 fig3 <- fig3 %>% layout(
-  title = "Figure 3: Change in Precision for different values of Minsplit and Maxdepth",
   scene = list(
-    xaxis = list(title = "split"),
-    yaxis = list(title = "depth"),
-    zaxis = list(title = "prec")
+    xaxis = list(title = "Split"),
+    yaxis = list(title = "Depth"),
+    zaxis = list(title = "Precision")
   ))
 fig3
 ```
@@ -833,22 +848,30 @@ fig3
 
 The winning model with the highest precision used the following parameter values: `cp` = 0, `minsplit` = 6, and `maxdepth` = 29. The resulting precision is 96.75%. We compared this to the model using the default values for parameters: `cp` = 0.07 (`cp` was tuned by default as part of `rpart` in `caret::train`), `minsplit` = 20, and `maxdepth` = 30. The resulting precision for the default model was 86.84%. Tuning parameters increased precision from 86.84% to 96.75%.
 
-`Figure 2` below shows the CART tree for the model using default values for the control parameters. The first split on the tree is `perCaps < 13`. The second split on the tree in `perHTML < 3.9`.
+`Figure 5` below shows the CART tree for the model using default values for the control parameters. The first split on the tree is `perCaps < 13`. The second split on the tree in `perHTML < 3.9`.
+
+<font size="4">
+<center> **Figure 5:  CART Tree with Default Paramter Values** </center>
+</font>
 
 ```{r}
 # tree with defaults
 par(mar=c(5,4,10,2))
-fancyRpartPlot(model_rpart_defaults$finalModel, sub="", main="Figure 2. CART Tree with Default Paramter Values")
+fancyRpartPlot(model_rpart_defaults$finalModel, sub="")
 ```
 
-The CART tree for the winning model, `Figure 3`, is shown below. We display this plot only to show the difference in complexity and the increase in `maxdepth`. The `maxdepth` makes this tree not easy to visualize.
+The CART tree for the winning model is shown below in `Figure 6`. We display this plot only to show the difference in complexity and the increase in `maxdepth`. The `maxdepth` makes this tree not easy to visualize.
 
+<font size="4">
+<center> **Figure 6:  CART Tree with Tuned Paramter Values** </center>
+<font>
+ 
 ```{r}
 #model_rpart_tuned
-fancyRpartPlot(model_rpart_tuned$finalModel, sub="", main="Figure 3. CART Tree with Tuned Paramter Values")
+fancyRpartPlot(model_rpart_tuned$finalModel, sub="")
 ```
 
-Printing the output from `Figure 3` is also quite verbose and we have choosen not to print it here. However, the first split on `perCaps` and the subsequent split for each branch are detailed below:
+Printing the output from `Figure 6` is also quite verbose and we have choosen not to print it here. However, the first split on `perCaps` and the subsequent split for each branch are detailed below:
 
 * Root Node
   + `perCaps` < 12.86: There are 8038 emails in this node. 1391 emails (17%) are incorrectly classified as spam. 
@@ -857,7 +880,8 @@ Printing the output from `Figure 3` is also quite verbose and we have choosen no
   + `perCaps` >= 12.86: There are 1310 emails in this node. 304 emails (23%) are incorrectly classified as not spam.
     + `numLines` < 9.5: There are 138 emails in this node. 17 emails (12%) are incorrectly classified as spam.
     + `numLines' >= 9.5: There are 1172 emails in this node. 183 emails (16%) are incorrectly classified as not spam.
-
+    
+In conclusion, tuning the model parameters significantly improved precision, from 86.84% to 96.75%. The values for the tuned parameters could be cause for concern in regards to overfitting. However, 5-fold cross validation was used in the model, which helps prevent against overfitting. The resulting tree is very deep and complex. The vast amount of data used to train the model makes this complexity possible to improve the model's precision.   
 
 # References 
 
