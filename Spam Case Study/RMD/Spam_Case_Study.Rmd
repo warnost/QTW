@@ -695,7 +695,7 @@ Below is a description of each derived feature. This information is also availab
 `bodyCharCt` is an integer count of the number of characters in the message.  
 `underscore` is a True / False flag that indicates if there is an underscore in the From field of the header.  
 `subExcCt` is a count of exclamation points in the subject line.    
-`subQuesCt` is a couint of question marks in the subject line.  
+`subQuesCt` is a count of question marks in the subject line.  
 `numAtt` is a count of the attachments in a message.  
 `priority` is a True / False flag if there is a priority key in the header.  
 `numRec` a count of the recipients of a message, including CCs.  
@@ -724,10 +724,12 @@ Below is a description of each derived feature. This information is also availab
 
 ## CART
 
-For our models, we use the `caret` package, which contains many models available for training using its `train` function. The model we will use to predict whether an email is spam or not-spam is CART (Classification and Regression Trees). The CART algorithm can be visualized as a branching tree with leaves or "nodes" representing the algorithm's predictions and the branches are calculated splits based on features in the model's feature space, which, in our problem, different features of emails, as described in the Dataset Preparation section. The algorithm repeatedly splits each feature to find the split which results in the greatest information gain. We give a simple example of one possible CART below. 
+For our models, we use the `caret` package, which contains many models available for training using its `train` function. The model we will use to predict whether an email is spam or not-spam is CART (Classification and Regression Trees). The CART algorithm can be visualized as a branching tree with leaves or "nodes" representing the algorithm's predictions and the branches are calculated splits based on features in the model's feature space, which, in our problem, different features of emails, as previously described in the Methods section. The algorithm repeatedly splits each feature to find the split which results in the greatest information gain. We give a simple example of one possible CART below. 
 
-`Figure 1` shows the resulting CART tree for the spam data, using `maxdepth=2`. In this model, the feature `perCaps` was determined to be the best initial split, or root node, of the data between non-spam (0) and spam (1). `perCaps < 13` checks the email message for whether the percentage of capital letters in the email is less than 13%. If it is, then it goes to the left node. Else, it goes to the right node.
+* `Figure 1` shows the resulting CART tree for the spam data, using `maxdepth=2`. In this model, the feature `perCaps` was determined to be the best initial split, or root node, of the data between non-spam (0) and spam (1). `perCaps < 13` checks the email message for whether the percentage of capital letters in the email is less than 13%. If it is, then it goes to the left node. Else, it goes to the right node.
+
   * Left node - `perHTML < 3.9`: In addition to having less than 13% capitalized letters, if the message characters consist of less than 3.9% HTML tags, then we classify the message as non-spam. Otherwise, we classify the message as spam.
+  
   * Right node - `numLines < 9.5`: In addition to having greater than or equal to 13% capitalized letters, if the message has less than 9.5 lines, then we classify the message as non-spam. Otherwise, we classify the message as spam.
 
 <font size="4">
@@ -783,7 +785,7 @@ Several evaluation metrics can be used to evaluate performance for a classificat
 
 There are benefits and downsides to the various evaluation metrics listed above. Accuracy is easy to understand, but it treats false positives (incorrectly identifying an email as spam) and false negatives (failing to identify an email as spam) equally. For spam, we assume that people would prefer to get the occasional spam email instead of potentially not seeing an important email because it is misclassified as spam. Therefore, our primary objective is to maximize the precision of spam.
 
-## Effects of Parameter tuning
+## Effects of Parameter Tuning
 
 The three graphs below show the effects of our parameter tuning. We compare the effects of different parameter values using a 3D mesh. Higher precision is better, so peaks in the 3D surface represent the best values of precision for a given combination of input parameters. We could use a 2D line to represent the best value of a parameter in isolation, but the 3D surface allows us to see the interaction between parameters. Since we have 3 parameters we are tuning, there will be multiple observations for any given combination of the two factors in the 3D plot. We take the average precision of the points for plotting purposes. Please note that `Figure 2`, `Figure 3`, and `Figure 4` are interactive and you can move the plots around.   
 
@@ -851,7 +853,7 @@ The winning model with the highest precision used the following parameter values
 `Figure 5` below shows the CART tree for the model using default values for the control parameters. The first split on the tree is `perCaps < 13`. The second split on the tree in `perHTML < 3.9`.
 
 <font size="4">
-<center> **Figure 5:  CART Tree with Default Paramter Values** </center>
+<center> **Figure 5:  CART Tree with Default Parameter Values** </center>
 </font>
 
 ```{r}
@@ -863,7 +865,7 @@ fancyRpartPlot(model_rpart_defaults$finalModel, sub="")
 The CART tree for the winning model is shown below in `Figure 6`. We display this plot only to show the difference in complexity and the increase in `maxdepth`. The `maxdepth` makes this tree not easy to visualize.
 
 <font size="4">
-<center> **Figure 6:  CART Tree with Tuned Paramter Values** </center>
+<center> **Figure 6:  CART Tree with Tuned Parameter Values** </center>
 <font>
  
 ```{r}
@@ -871,7 +873,7 @@ The CART tree for the winning model is shown below in `Figure 6`. We display thi
 fancyRpartPlot(model_rpart_tuned$finalModel, sub="")
 ```
 
-Printing the output from `Figure 6` is also quite verbose and we have choosen not to print it here. However, the first split on `perCaps` and the subsequent split for each branch are detailed below:
+Printing the output from `Figure 6` is also quite verbose and we have chosen not to print it here. However, the first split on `perCaps` and the subsequent split for each branch are detailed below:
 
 * Root Node
   + `perCaps` < 12.86: There are 8038 emails in this node. 1391 emails (17%) are incorrectly classified as spam. 
@@ -881,7 +883,7 @@ Printing the output from `Figure 6` is also quite verbose and we have choosen no
     + `numLines` < 9.5: There are 138 emails in this node. 17 emails (12%) are incorrectly classified as spam.
     + `numLines' >= 9.5: There are 1172 emails in this node. 183 emails (16%) are incorrectly classified as not spam.
     
-In conclusion, tuning the model parameters significantly improved precision, from 86.84% to 96.75%. The values for the tuned parameters could be cause for concern in regards to overfitting. However, 5-fold cross validation was used in the model, which helps prevent against overfitting. The resulting tree is very deep and complex. The vast amount of data used to train the model makes this complexity possible to improve the model's precision.   
+In conclusion, our research of the different parameters available for tuning the CART algorithm--specifically, `minsplit`,`maxdepth`, and `cp`--led us to create a better model for classifying email messages as spam or non-spam. Tuning these model parameters significantly improved precision, from 86.84% to 96.75%. Additionally, our winning tree makes sense in terms of the resulting winning parameters. Our winning tree is relatively deep, with a low minimum split value and a low CP threshold. Those qualities can lead to complex trees that perform well on training data, as our winning model did. The values for the tuned parameters could be cause for concern in regards to overfitting. However, 5-fold cross validation was used in the model, which helps prevent against overfitting. The resulting tree is very deep and complex. The vast amount of data used to train the model makes this complexity possible to improve the model's precision.   
 
 # References 
 
