@@ -94,18 +94,13 @@ for(i in 1:nrow(control_grid)) {
                             tuneGrid = cart_grid, na.action = na.omit)
   
   results=as.data.frame(model_rpart$results)
-  results1=results[which(results$F1==max(results$F1)),]
   
-  results_combined[i,"minsplit"] = control_grid$minsplit[i]
-  results_combined[i,"maxdepth"] = control_grid$maxdepth[i]
-  results_combined[i,"cp"] = results1$cp
-  results_combined[i,"F1"] = results1$F1
-  results_combined[i,"Accuracy"] = results1$Accuracy
-  results_combined[i,"prec"] = results1$prec
-  results_combined[i,"rec"] = results1$rec
-  results_combined[i,"Type_I_err"] = results1$Type_I_err
-  results_combined[i,"Type_II_err"] = results1$Type_II_err
-  #results_combined$model <- model_rpart
+  
+  results$minsplit = control_grid$minsplit[i]
+  results$maxdepth = control_grid$maxdepth[i]
+  
+  if (i!=1) { final_result <- rbind(final_result,results) } else {final_result <- results}
+
   print(paste0(round(i/nrow(control_grid),4)*100,"% complete",sep=""))
 }
 
