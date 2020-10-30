@@ -1,0 +1,57 @@
+---
+title: "Missing Data"
+output: html_notebook
+---
+
+
+```{r}
+library(tidyverse)
+train <- read_csv("C:/Users/William/OneDrive/MSDS_7331_QTW/QTW/Missing Data Case Study/train.csv",guess_max =40000)
+train<-repair_names(train, prefix = "V", sep = "")
+View(train)
+```
+
+
+```{r}
+library(naniar)
+miss_cols <- colnames(train)[colSums(is.na(train)) > 0]
+vis_miss(train[,miss_cols], warn_large_data = F) + coord_flip()
+
+```
+
+?naniar
+?
+```{r}
+cafe <- train[,c(miss_cols,"sub_area","state")] %>% select(contains("cafe"),"sub_area","state")
+vis_miss(cafe, warn_large_data = F) + coord_flip()
+```
+
+```{r}
+ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_500)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_1000)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_1500)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_2000)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_3000)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_5000)) + geom_boxplot()
+```
+
+```{r}
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_500_min_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_1000_min_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_1500_min_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_2000_min_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_3000_min_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_5000_min_price_avg)) + geom_boxplot()
+```
+```{r}
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_500_max_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_1000_max_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_1500_max_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_2000_max_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_3000_max_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_5000_max_price_avg)) + geom_boxplot()
+```
+```{r}
+ggplot(train,aes(x=sub_area,y=prom_part_5000)) + geom_boxplot()
+```
+
