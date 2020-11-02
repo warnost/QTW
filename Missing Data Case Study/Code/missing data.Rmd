@@ -16,7 +16,7 @@ View(train)
 library(naniar)
 miss_cols <- colnames(train)[colSums(is.na(train)) > 0]
 vis_miss(train[,miss_cols], warn_large_data = F) + coord_flip()
-
+ggsave(filename='viss_miss_plot.png',height = 12, width = 12)
 ```
 
 ?naniar
