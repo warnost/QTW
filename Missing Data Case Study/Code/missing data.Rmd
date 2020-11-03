@@ -27,16 +27,23 @@ vis_miss(cafe, warn_large_data = F) + coord_flip()
 ```
 
 ```{r}
-ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_500)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_500)) + geom_boxplot() + theme(
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + ggtitle("Cafe Average Price by Sub Area") + ylab("Cafe Average Price (500M)") + xlab("Sub Area")
+ggsave("boxplot.png")
+
 ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_1000)) + geom_boxplot()
 ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_1500)) + geom_boxplot()
 ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_2000)) + geom_boxplot()
 ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_3000)) + geom_boxplot()
-ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_5000)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_avg_price_5000)) + geom_boxplot() + theme(
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + ggtitle("Cafe Average Price by Sub Area") + ylab("Cafe Average Price (5000M)") + xlab("Sub Area")
+ggsave("boxplot.png")
 ```
 
 ```{r}
-ggplot(cafe,aes(x=sub_area,y=cafe_sum_500_min_price_avg)) + geom_boxplot()
+ggplot(cafe,aes(x=sub_area,y=cafe_sum_500_min_price_avg)) + geom_boxplot() 
 ggplot(cafe,aes(x=sub_area,y=cafe_sum_1000_min_price_avg)) + geom_boxplot()
 ggplot(cafe,aes(x=sub_area,y=cafe_sum_1500_min_price_avg)) + geom_boxplot()
 ggplot(cafe,aes(x=sub_area,y=cafe_sum_2000_min_price_avg)) + geom_boxplot()
